@@ -1,0 +1,344 @@
+const { sequelize } = require('../../config/db')
+const { Op } = require('sequelize')
+const { buildPagination } = require('../../utils/pagination')
+const { createAuditLog } = require('../../utils/audit')
+const Quotation = require('./quotation.model')
+const QuotationService = require('../quotationServices/quotationService.model')
+const QuotationDocument = require('../quotationDocuments/quotationDocument.model')
+const QuotationProviderQuote = require('../quotationProviderQuotes/quotationProviderQuote.model')
+const QuotationSale = require('../quotationSales/quotationSale.model')
+const QuotationTrace = require('../quotationTraces/quotationTrace.model')
+const Shipment = require('../shipments/shipment.model')
+const {
+  createShipmentFromQuotation,
+  getShipmentById,
+} = require('../shipments/shipment.service')
+
+async function syncQuotationServices(quotationId, services, transaction) {
+  if (!Array.isArray(services)) return
+
+  await QuotationService.destroy({
+    where: { quotation_id: quotationId },
+    transaction,
+  })
+
+  if (!services.length) return
+
+  await QuotationService.bulkCreate(
+    services.map(service => ({
+      quotation_id: quotationId,
+      service_code: service.service_code,
+      enabled: service.enabled !== undefined ? service.enabled : true,
+      created_at: new Date(),
+      updated_at: new Date(),
+    })),
+    { transaction }
+  )
+}
+
+function ensureQuotationEditable(quotation) {
+  if (quotation?.status === 'CONVERTIDA') {
+    const error = new Error('La CT convertida a DO ya no puede modificarse')
+    error.status = 400
+    throw error
+  }
+
+  if (quotation?.closure_status === 'CIERRE_NO_EXITOSO') {
+    const error = new Error('La CT cerrada como no exitosa ya no puede modificarse')
+    error.status = 400
+    throw error
+  }
+}
+
+function buildCreatedAtWhere(query = {}) {
+  const from = String(query.date_from || query.from || '').trim()
+  const to = String(query.date_to || query.to || '').trim()
+  if (!from && !to) return null
+
+  const createdAt = {}
+
+  if (from) {
+    const startDate = new Date(`${from}T00:00:00.000Z`)
+    if (!Number.isNaN(startDate.getTime())) {
+      createdAt[Op.gte] = startDate
+    }
+  }
+
+  if (to) {
+    const endDate = new Date(`${to}T23:59:59.999Z`)
+    if (!Number.isNaN(endDate.getTime())) {
+      createdAt[Op.lte] = endDate
+    }
+  }
+
+  return Reflect.ownKeys(createdAt).length ? createdAt : null
+}
+
+async function listQuotations(query) {
+  const { page, limit, offset } = buildPagination(query.page, query.limit)
+  const where = {}
+  const includeUnsuccessful = ['1', 'true', 'si', 'yes'].includes(
+    String(query.include_unsuccessful || '').trim().toLowerCase()
+  )
+  const onlyUnsuccessful = ['1', 'true', 'si', 'yes'].includes(
+    String(query.only_unsuccessful || '').trim().toLowerCase()
+  )
+
+  if (query.status) where.status = query.status
+  if (query.customer_id) where.customer_id = query.customer_id
+  if (query.transport_mode) where.transport_mode = query.transport_mode
+  if (query.lead_external_id) where.lead_external_id = query.lead_external_id
+  if (query.project_external_id) where.project_external_id = query.project_external_id
+  if (query.closure_status) {
+    where.closure_status = query.closure_status
+  } else if (onlyUnsuccessful) {
+    where.closure_status = 'CIERRE_NO_EXITOSO'
+  } else if (!includeUnsuccessful) {
+    where.closure_status = { [Op.ne]: 'CIERRE_NO_EXITOSO' }
+  }
+  const createdAtWhere = buildCreatedAtWhere(query)
+  if (createdAtWhere) where.created_at = createdAtWhere
+
+  const { count, rows } = await Quotation.findAndCountAll({
+    where,
+    include: [
+      { model: QuotationService, as: 'services' },
+      { model: QuotationDocument, as: 'documents' },
+      { model: QuotationProviderQuote, as: 'provider_quotes' },
+      { model: QuotationSale, as: 'sales' },
+      { model: QuotationTrace, as: 'traces' },
+      { model: Shipment, as: 'shipments' },
+    ],
+    order: [['created_at', 'DESC']],
+    limit,
+    offset,
+    distinct: true,
+  })
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows,
+  }
+}
+
+async function getQuotationById(id) {
+  return Quotation.findByPk(id, {
+    include: [
+      { model: QuotationService, as: 'services' },
+      { model: QuotationDocument, as: 'documents' },
+      { model: QuotationProviderQuote, as: 'provider_quotes' },
+      { model: QuotationSale, as: 'sales' },
+      { model: QuotationTrace, as: 'traces' },
+      { model: Shipment, as: 'shipments' },
+    ],
+  })
+}
+
+async function createQuotation(data, userId) {
+  const transaction = await sequelize.transaction()
+
+  try {
+    const quotation = await Quotation.create(
+      {
+        ...data,
+        created_by: userId,
+        updated_by: userId,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      { transaction }
+    )
+
+    await syncQuotationServices(quotation.id, data.services || [], transaction)
+
+    await createAuditLog({
+      entity_type: 'quotation',
+      entity_id: quotation.id,
+      action: 'CREACION_CT',
+      new_values: {
+        ...quotation.toJSON(),
+        services: data.services || [],
+      },
+      user_id: userId,
+      transaction,
+    })
+
+    await transaction.commit()
+    return getQuotationById(quotation.id)
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  }
+}
+
+async function updateQuotation(id, data, userId) {
+  const transaction = await sequelize.transaction()
+
+  try {
+    const quotation = await Quotation.findByPk(id, { transaction })
+    if (!quotation) {
+      const error = new Error('Cotización no encontrada')
+      error.status = 404
+      throw error
+    }
+
+    ensureQuotationEditable(quotation)
+
+    const before = quotation.toJSON()
+
+    await quotation.update(
+      {
+        ...data,
+        updated_by: userId,
+        updated_at: new Date(),
+      },
+      { transaction }
+    )
+
+    if (Array.isArray(data.services)) {
+      await syncQuotationServices(id, data.services, transaction)
+    }
+
+    await createAuditLog({
+      entity_type: 'quotation',
+      entity_id: quotation.id,
+      action: 'ACTUALIZACION_CT',
+      old_values: before,
+      new_values: {
+        ...quotation.toJSON(),
+        services: data.services,
+      },
+      user_id: userId,
+      transaction,
+    })
+
+    await transaction.commit()
+    return getQuotationById(id)
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  }
+}
+
+async function approveQuotation(id, userId) {
+  const transaction = await sequelize.transaction()
+
+  try {
+    const quotation = await Quotation.findByPk(id, {
+      include: [
+        { model: QuotationService, as: 'services' },
+        { model: QuotationProviderQuote, as: 'provider_quotes' },
+        { model: QuotationSale, as: 'sales' },
+      ],
+      transaction,
+    })
+
+    if (!quotation) {
+      const error = new Error('Cotización no encontrada')
+      error.status = 404
+      throw error
+    }
+
+    const oldStatus = quotation.status
+
+    await quotation.update(
+      {
+        status: 'APROBADA',
+        updated_by: userId,
+        updated_at: new Date(),
+      },
+      { transaction }
+    )
+
+    await createAuditLog({
+      entity_type: 'quotation',
+      entity_id: quotation.id,
+      action: 'APROBACION_CT',
+      old_values: { status: oldStatus },
+      new_values: { status: 'APROBADA' },
+      user_id: userId,
+      transaction,
+    })
+
+    const shipment = await createShipmentFromQuotation(quotation, userId, transaction)
+
+    await quotation.update(
+      {
+        status: 'CONVERTIDA',
+        closure_status: 'CIERRE_EXITOSO',
+        updated_by: userId,
+        updated_at: new Date(),
+      },
+      { transaction }
+    )
+
+    await transaction.commit()
+
+    return {
+      quotation: await getQuotationById(id),
+      shipment: await getShipmentById(shipment.id),
+    }
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  }
+}
+
+async function closeQuotationUnsuccessful(id, userId) {
+  const transaction = await sequelize.transaction()
+
+  try {
+    const quotation = await Quotation.findByPk(id, { transaction })
+    if (!quotation) {
+      const error = new Error('Cotización no encontrada')
+      error.status = 404
+      throw error
+    }
+
+    if (quotation.status === 'CONVERTIDA') {
+      const error = new Error('La CT convertida a DO no puede cerrarse como no exitosa')
+      error.status = 400
+      throw error
+    }
+
+    ensureQuotationEditable(quotation)
+
+    const before = quotation.toJSON()
+
+    await quotation.update(
+      {
+        closure_status: 'CIERRE_NO_EXITOSO',
+        updated_by: userId,
+        updated_at: new Date(),
+      },
+      { transaction }
+    )
+
+    await createAuditLog({
+      entity_type: 'quotation',
+      entity_id: quotation.id,
+      action: 'CIERRE_CT_NO_EXITOSO',
+      old_values: before,
+      new_values: quotation.toJSON(),
+      user_id: userId,
+      transaction,
+    })
+
+    await transaction.commit()
+    return getQuotationById(id)
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  }
+}
+
+module.exports = {
+  listQuotations,
+  getQuotationById,
+  createQuotation,
+  updateQuotation,
+  approveQuotation,
+  closeQuotationUnsuccessful,
+}

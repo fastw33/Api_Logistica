@@ -1,0 +1,305 @@
+{
+  "currency": "USD",
+  "validity_months": 6,
+  "version": "2026-H1",
+  "services": {
+    "maritimo_lcl_hasta_8_metros": {
+      "code": "maritimo_lcl_hasta_8_metros",
+      "label": "Marítimo LCL hasta 8 metros",
+      "requires_provider_pricing": true,
+      "limits": { "max_volume_m3": 8 },
+      "charges": [
+        {
+          "concept": "Gastos en origen",
+          "base_key": "doc_fee",
+          "tariff": 95,
+          "minimum": 95,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        },
+        {
+          "concept": "Flete internacional",
+          "base_key": "baf_fs",
+          "tariff": 25,
+          "minimum": 110,
+          "unit": "ton_mt3",
+          "charge_type": "variable con minima"
+        },
+        {
+          "concept": "Gastos en destino",
+          "base_key": "radicacion",
+          "tariff": 95,
+          "minimum": 95,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "maritimo_lcl_0_2_metros": {
+      "code": "maritimo_lcl_0_2_metros",
+      "label": "Marítimo LCL 0 a 2 metros",
+      "requires_provider_pricing": true,
+      "limits": { "max_volume_m3": 0.2 },
+      "charges": [
+        {
+          "concept": "Gastos en origen",
+          "base_key": "doc_fee",
+          "tariff": 55,
+          "minimum": 55,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        },
+        {
+          "concept": "Flete internacional",
+          "base_key": "baf",
+          "tariff": 80,
+          "minimum": 80,
+          "unit": "ton_mt3",
+          "charge_type": "variable con minima"
+        },
+        {
+          "concept": "Gastos en destino",
+          "base_key": "radicacion",
+          "tariff": 80,
+          "minimum": 80,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "maritimo_fcl_1x20": {
+      "code": "maritimo_fcl_1x20",
+      "label": "Marítimo FCL 1x20",
+      "requires_provider_pricing": true,
+      "charges": [
+        {
+          "concept": "Gastos en origen",
+          "base_key": "doc_fee",
+          "tariff": 50,
+          "minimum": 50,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        },
+        {
+          "concept": "Flete internacional",
+          "base_key": "baf",
+          "tariff": 150,
+          "minimum": 150,
+          "unit": "contenedor",
+          "charge_type": "variable con minima"
+        },
+        {
+          "concept": "Gastos en destino",
+          "base_key": "radicacion",
+          "tariff": 180,
+          "minimum": 180,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "maritimo_fcl_1x40": {
+      "code": "maritimo_fcl_1x40",
+      "label": "Marítimo FCL 1x40",
+      "requires_provider_pricing": true,
+      "charges": [
+        {
+          "concept": "Gastos en origen",
+          "base_key": "doc_fee",
+          "tariff": 50,
+          "minimum": 50,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        },
+        {
+          "concept": "Flete internacional",
+          "base_key": "baf",
+          "tariff": 200,
+          "minimum": 200,
+          "unit": "contenedor",
+          "charge_type": "variable con minima"
+        },
+        {
+          "concept": "Gastos en destino",
+          "base_key": "radicacion",
+          "tariff": 180,
+          "minimum": 180,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "aereo_general": {
+      "code": "aereo_general",
+      "label": "Aéreo general",
+      "requires_provider_pricing": true,
+      "charges": [
+        {
+          "concept": "Gastos en origen",
+          "base_key": "doc_fee",
+          "tariff": 65,
+          "minimum": 65,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        },
+        {
+          "concept": "Flete aéreo",
+          "base_key": "fs",
+          "tariff": 0.3,
+          "minimum": 95,
+          "unit": "kg_vol",
+          "charge_type": "variable con minima"
+        },
+        {
+          "concept": "Gastos en destino",
+          "base_key": "coordinacion",
+          "tariff": 80,
+          "minimum": 80,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "aereo_triangulacion": {
+      "code": "aereo_triangulacion",
+      "label": "Aéreo triangulación",
+      "requires_provider_pricing": true,
+      "charges": [
+        {
+          "concept": "Gastos en origen",
+          "base_key": "doc_fee",
+          "tariff": 80,
+          "minimum": 80,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        },
+        {
+          "concept": "Flete aéreo",
+          "base_key": "fs",
+          "tariff": 0.4,
+          "minimum": 200,
+          "unit": "kg_vol",
+          "charge_type": "variable con minima"
+        },
+        {
+          "concept": "Gastos en destino",
+          "base_key": "coordinacion",
+          "tariff": 100,
+          "minimum": 100,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "aereo_tarifa_global": {
+      "code": "aereo_tarifa_global",
+      "label": "Aéreo tarifa global",
+      "requires_provider_pricing": true,
+      "charges": [
+        {
+          "concept": "Gastos en origen",
+          "base_key": "doc_fee",
+          "tariff": 80,
+          "minimum": 80,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        },
+        {
+          "concept": "Flete aéreo",
+          "base_key": "fs",
+          "tariff": 0.4,
+          "minimum": 200,
+          "unit": "kg_vol",
+          "charge_type": "variable con minima"
+        },
+        {
+          "concept": "Gastos en destino",
+          "base_key": "coordinacion",
+          "tariff": 100,
+          "minimum": 100,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "aereo_courier": {
+      "code": "aereo_courier",
+      "label": "Aéreo courier",
+      "requires_provider_pricing": false,
+      "charges": [
+        {
+          "concept": "Gestión documental",
+          "base_key": "coordinacion",
+          "tariff": 95,
+          "minimum": 95,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "agenciamiento_aduanero": {
+      "code": "agenciamiento_aduanero",
+      "label": "Agenciamiento aduanero",
+      "requires_provider_pricing": false,
+      "charges": [
+        {
+          "concept": "Coordinación logística",
+          "base_key": "coordinacion",
+          "tariff": 100,
+          "minimum": 100,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    },
+    "transporte_terrestre_fcl": {
+      "code": "transporte_terrestre_fcl",
+      "label": "Transporte terrestre FCL",
+      "requires_provider_pricing": true,
+      "charges": [
+        {
+          "concept": "Coordinación logística 1x40",
+          "base_key": "coordinacion",
+          "tariff": 110,
+          "minimum": 110,
+          "unit": "contenedor",
+          "charge_type": "variable con minima",
+          "container_size": "40"
+        },
+        {
+          "concept": "Coordinación logística 1x20",
+          "base_key": "coordinacion",
+          "tariff": 95,
+          "minimum": 95,
+          "unit": "contenedor",
+          "charge_type": "variable con minima",
+          "container_size": "20"
+        }
+      ]
+    },
+    "transporte_terrestre_otm": {
+      "code": "transporte_terrestre_otm",
+      "label": "Transporte terrestre OTM",
+      "requires_provider_pricing": true,
+      "charges": [
+        {
+          "concept": "Presentación OTM",
+          "base_key": "presentacion_otm",
+          "tariff": 95,
+          "minimum": 95,
+          "unit": "fijo",
+          "charge_type": "fijo con minima"
+        }
+      ]
+    }
+  },
+  "not_included_defaults": [
+    "Gastos portuarios estimados",
+    "Nacionalización",
+    "Tributos",
+    "Impuestos",
+    "Inspecciones",
+    "Cuarentenas",
+    "Costos extraordinarios no confirmados"
+  ]
+}
