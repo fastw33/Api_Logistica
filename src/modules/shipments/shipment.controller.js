@@ -14,6 +14,58 @@ function buildUploadedFileUrl(folder, shipmentId, file) {
   return `/uploads/${folder}/shipment-${shipmentId}/${file.filename}`
 }
 
+function getUploadedFile(req, fieldName) {
+  const fileGroup = req.files?.[fieldName]
+  return Array.isArray(fileGroup) && fileGroup.length ? fileGroup[0] : null
+}
+
+function getSupportUploadFile(req) {
+  return (
+    getUploadedFile(req, 'file') ||
+    getUploadedFile(req, 'payment_file') ||
+    req.file ||
+    null
+  )
+}
+
+function buildInvoicePayload(req, shipmentId, folderName) {
+  const invoiceFile = getUploadedFile(req, 'invoice_file')
+
+  return {
+    ...req.body,
+    support_file_url: invoiceFile
+      ? buildUploadedFileUrl(folderName, shipmentId, invoiceFile)
+      : req.body.support_file_url || null,
+  }
+}
+
+async function createPaymentSupportFromUpload({
+  req,
+  shipmentId,
+  invoiceId,
+  referenceType,
+  invoiceNumber,
+  folderName,
+  userId,
+}) {
+  const paymentFile = getUploadedFile(req, 'payment_file')
+  if (!paymentFile) return null
+
+  return createFinancialSupport(
+    shipmentId,
+    {
+      support_type: 'SOPORTE_PAGO',
+      reference_type: referenceType,
+      reference_id: invoiceId,
+      file_url: buildUploadedFileUrl(folderName, shipmentId, paymentFile),
+      notes:
+        req.body.payment_support_notes ||
+        `Comprobante de pago relacionado a ${invoiceNumber}`,
+    },
+    userId
+  )
+}
+
 exports.getAllShipments = async (req, res, next) => {
   try {
     const result = await shipmentService.listShipments(req.query)
@@ -25,7 +77,7 @@ exports.getAllShipments = async (req, res, next) => {
 
 exports.getShipmentById = async (req, res, next) => {
   try {
-    const shipment = await shipmentService.getShipmentById(req.params.id)
+    const shipment = await shipmentService.getShipmentById(req.params.id, req.query)
     if (!shipment) {
       return res.status(404).json({ message: 'Shipment no encontrado' })
     }
@@ -85,6 +137,7 @@ exports.createDocument = async (req, res, next) => {
         quotation_id: req.body.quotation_id || null,
         document_type: req.body.document_type,
         document_name: req.body.document_name || req.file?.originalname || 'Documento',
+        package_name: req.body.package_name || null,
         file_url: fileUrl,
         file_size: req.file?.size || null,
         mime_type: req.file?.mimetype || null,
@@ -199,11 +252,31 @@ exports.createSale = async (req, res, next) => {
 
 exports.createCustomerInvoice = async (req, res, next) => {
   try {
+    const shipmentId = Number(req.params.id)
+    const payload = buildInvoicePayload(req, shipmentId, 'customer-invoices')
+
+    if (!payload.support_file_url) {
+      return res.status(400).json({
+        message: 'Debes adjuntar el archivo de la factura cliente',
+      })
+    }
+
     const invoice = await createCustomerInvoice(
-      req.params.id,
-      req.body,
+      shipmentId,
+      payload,
       req.usuario?.id_usuario || null
     )
+
+    await createPaymentSupportFromUpload({
+      req,
+      shipmentId,
+      invoiceId: invoice.id,
+      referenceType: 'customer_invoice',
+      invoiceNumber: invoice.invoice_number,
+      folderName: 'customer-invoices',
+      userId: req.usuario?.id_usuario || null,
+    })
+
     res.status(201).json({
       message: 'Factura de cliente registrada correctamente',
       data: invoice,
@@ -215,11 +288,31 @@ exports.createCustomerInvoice = async (req, res, next) => {
 
 exports.createVendorInvoice = async (req, res, next) => {
   try {
+    const shipmentId = Number(req.params.id)
+    const payload = buildInvoicePayload(req, shipmentId, 'vendor-invoices')
+
+    if (!payload.support_file_url) {
+      return res.status(400).json({
+        message: 'Debes adjuntar el archivo de la factura proveedor',
+      })
+    }
+
     const invoice = await createVendorInvoice(
-      req.params.id,
-      req.body,
+      shipmentId,
+      payload,
       req.usuario?.id_usuario || null
     )
+
+    await createPaymentSupportFromUpload({
+      req,
+      shipmentId,
+      invoiceId: invoice.id,
+      referenceType: 'vendor_invoice',
+      invoiceNumber: invoice.invoice_number,
+      folderName: 'vendor-invoices',
+      userId: req.usuario?.id_usuario || null,
+    })
+
     res.status(201).json({
       message: 'Factura de proveedor registrada correctamente',
       data: invoice,
@@ -232,9 +325,14 @@ exports.createVendorInvoice = async (req, res, next) => {
 exports.createFinancialSupport = async (req, res, next) => {
   try {
     const shipmentId = Number(req.params.id)
-    const fileUrl = req.file
-      ? buildUploadedFileUrl('financial-supports', shipmentId, req.file)
+    const uploadedFile = getSupportUploadFile(req)
+    const fileUrl = uploadedFile
+      ? buildUploadedFileUrl('financial-supports', shipmentId, uploadedFile)
       : req.body.file_url
+    const supportType =
+      req.body.support_type ||
+      (getUploadedFile(req, 'payment_file') ? 'SOPORTE_PAGO' : null)
+    const notes = req.body.notes || req.body.payment_support_notes || null
 
     if (!fileUrl) {
       return res.status(400).json({
@@ -245,11 +343,11 @@ exports.createFinancialSupport = async (req, res, next) => {
     const support = await createFinancialSupport(
       shipmentId,
       {
-        support_type: req.body.support_type,
+        support_type: supportType,
         reference_type: req.body.reference_type || null,
         reference_id: req.body.reference_id || null,
         file_url: fileUrl,
-        notes: req.body.notes || null,
+        notes,
       },
       req.usuario?.id_usuario || null
     )

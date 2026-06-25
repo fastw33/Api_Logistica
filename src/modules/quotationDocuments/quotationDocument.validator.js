@@ -15,6 +15,10 @@ exports.validateCreate = [
     .optional({ nullable: true })
     .isString()
     .withMessage('document_name debe ser string'),
+  body('package_name')
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('package_name debe ser string'),
   body('file_url')
     .optional({ nullable: true })
     .isString()

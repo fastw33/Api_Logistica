@@ -25,6 +25,10 @@ const ShipmentDocument = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: false,
     },
+    package_name: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     file_url: {
       type: DataTypes.STRING(500),
       allowNull: false,

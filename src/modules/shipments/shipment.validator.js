@@ -10,6 +10,10 @@ const {
 } = require('../../utils/logisticsEnums')
 
 const commonShipmentRules = [
+  body('line_key')
+    .optional({ values: 'falsy' })
+    .isIn(['fastway', 'harvest', 'greenway'])
+    .withMessage('line_key debe ser uno de: fastway, harvest, greenway'),
   body('quotation_id').optional({ nullable: true }).isInt().withMessage('quotation_id debe ser entero'),
   body('lead_external_id').optional().isString().withMessage('lead_external_id debe ser string'),
   body('customer_id').optional().isString().withMessage('customer_id debe ser string'),

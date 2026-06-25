@@ -3,8 +3,15 @@ const { createAuditLog } = require('../../utils/audit')
 const Shipment = require('../shipments/shipment.model')
 const ShipmentCost = require('../shipmentCosts/shipmentCost.model')
 const VendorInvoice = require('./vendorInvoice.model')
+const { syncShipmentFinancialState } = require('../shipments/shipmentFinancialState.service')
 
-async function syncInvoiceCosts(invoiceId, costIds, transaction) {
+function resolveCostStatus(paymentStatus) {
+  return String(paymentStatus || '').trim().toUpperCase() === 'PAGADA'
+    ? 'PAGADO'
+    : 'FACTURADO'
+}
+
+async function syncInvoiceCosts(invoiceId, costIds, paymentStatus, transaction) {
   if (!Array.isArray(costIds)) return
 
   await ShipmentCost.update(
@@ -17,7 +24,7 @@ async function syncInvoiceCosts(invoiceId, costIds, transaction) {
   await ShipmentCost.update(
     {
       vendor_invoice_id: invoiceId,
-      status: 'FACTURADO',
+      status: resolveCostStatus(paymentStatus),
       updated_at: new Date(),
     },
     { where: { id: costIds }, transaction }
@@ -47,16 +54,22 @@ async function createVendorInvoice(shipmentId, data, userId) {
       { transaction }
     )
 
-    await syncInvoiceCosts(invoice.id, data.cost_ids, transaction)
+    await syncInvoiceCosts(
+      invoice.id,
+      data.cost_ids,
+      data.payment_status,
+      transaction
+    )
 
     await shipment.update(
       {
-        financial_status: 'PENDIENTE_PAGOS',
         updated_by: userId,
         updated_at: new Date(),
       },
       { transaction }
     )
+
+    await syncShipmentFinancialState(shipmentId, transaction)
 
     await createAuditLog({
       shipment_id: shipmentId,
@@ -98,7 +111,14 @@ async function updateVendorInvoice(id, data, userId) {
       { transaction }
     )
 
-    await syncInvoiceCosts(invoice.id, data.cost_ids, transaction)
+    await syncInvoiceCosts(
+      invoice.id,
+      data.cost_ids,
+      data.payment_status || invoice.payment_status,
+      transaction
+    )
+
+    await syncShipmentFinancialState(invoice.shipment_id, transaction)
 
     await createAuditLog({
       shipment_id: invoice.shipment_id,

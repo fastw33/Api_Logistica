@@ -13,6 +13,7 @@ const customerInvoiceValidator = require('../customerInvoices/customerInvoice.va
 const vendorInvoiceValidator = require('../vendorInvoices/vendorInvoice.validator')
 const financialSupportValidator = require('../financialSupports/financialSupport.validator')
 const upload = require('../../middlewares/documentUpload.middleware')
+const { normalizeInvoicePayload } = require('../../middlewares/invoicePayload.middleware')
 const validate = require('../../utils/validatorResult')
 
 router.get('/', controller.getAllShipments)
@@ -41,12 +42,32 @@ router.post('/:id/costs', costValidator.validateCreate, validate, controller.cre
 router.post('/:id/sales', saleValidator.validateCreate, validate, controller.createSale)
 router.post(
   '/:id/customer-invoices',
+  (req, res, next) => {
+    req.uploadFolder = 'customer-invoices'
+    req.uploadEntity = 'shipment'
+    next()
+  },
+  upload.fields([
+    { name: 'invoice_file', maxCount: 1 },
+    { name: 'payment_file', maxCount: 1 },
+  ]),
+  normalizeInvoicePayload,
   customerInvoiceValidator.validateCreate,
   validate,
   controller.createCustomerInvoice
 )
 router.post(
   '/:id/vendor-invoices',
+  (req, res, next) => {
+    req.uploadFolder = 'vendor-invoices'
+    req.uploadEntity = 'shipment'
+    next()
+  },
+  upload.fields([
+    { name: 'invoice_file', maxCount: 1 },
+    { name: 'payment_file', maxCount: 1 },
+  ]),
+  normalizeInvoicePayload,
   vendorInvoiceValidator.validateCreate,
   validate,
   controller.createVendorInvoice
@@ -58,7 +79,10 @@ router.post(
     req.uploadEntity = 'shipment'
     next()
   },
-  upload.single('file'),
+  upload.fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'payment_file', maxCount: 1 },
+  ]),
   financialSupportValidator.validateCreate,
   validate,
   controller.createFinancialSupport

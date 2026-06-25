@@ -25,6 +25,29 @@ const VendorInvoice = require('../vendorInvoices/vendorInvoice.model')
 const FinancialSupport = require('../financialSupports/financialSupport.model')
 const ShipmentAuditLog = require('../shipmentAuditLogs/shipmentAuditLog.model')
 
+function hasInvoiceAttachment(invoice) {
+  return Boolean(invoice?.support_file_url || invoice?.pdf_url || invoice?.xml_url)
+}
+
+function deriveFinancialStatus(currentStatus, customerInvoiced, vendorInvoiced) {
+  if (['CIERRE_FINANCIERO', 'CERRADA'].includes(String(currentStatus || '').trim().toUpperCase())) {
+    return currentStatus
+  }
+
+  if (customerInvoiced && vendorInvoiced) return 'RENTABILIDAD_CALCULADA'
+  if (customerInvoiced) return 'PENDIENTE_FACTURAS_PROVEEDOR'
+  if (vendorInvoiced) return 'PENDIENTE_FACTURACION'
+  return 'PENDIENTE_FACTURACION'
+}
+
+function deriveClosureStatusFromOperationalStatus(operationalStatus) {
+  return ['FINALIZADA_OPERATIVAMENTE', 'CANCELADA'].includes(
+    String(operationalStatus || '').trim().toUpperCase()
+  )
+    ? 'CERRADO'
+    : 'ABIERTO'
+}
+
 function mapServiceCodeToCostType(serviceCode) {
   switch (serviceCode) {
     case 'FLETE_INTERNACIONAL':
@@ -169,29 +192,155 @@ async function seedShipmentCommercialBase(shipment, quotation, userId, transacti
   }
 }
 
-function shipmentIncludes() {
+function shipmentDetailIncludes() {
   return [
     {
       model: Quotation,
       as: 'quotation',
       include: [
-        { model: QuotationService, as: 'services' },
-        { model: QuotationDocument, as: 'documents' },
-        { model: QuotationProviderQuote, as: 'provider_quotes' },
-        { model: QuotationSale, as: 'sales' },
+        { model: QuotationService, as: 'services', separate: true },
+        { model: QuotationDocument, as: 'documents', separate: true },
+        { model: QuotationProviderQuote, as: 'provider_quotes', separate: true },
+        { model: QuotationSale, as: 'sales', separate: true },
       ],
     },
-    { model: ShipmentDocument, as: 'documents' },
-    { model: ShipmentTrace, as: 'traces' },
-    { model: ShipmentProvider, as: 'providers' },
-    { model: ShipmentTask, as: 'tasks' },
-    { model: ShipmentDimension, as: 'dimensions' },
-    { model: ShipmentCost, as: 'costs' },
-    { model: ShipmentSale, as: 'sales' },
-    { model: CustomerInvoice, as: 'customer_invoices' },
-    { model: VendorInvoice, as: 'vendor_invoices' },
-    { model: FinancialSupport, as: 'financial_supports' },
-    { model: ShipmentAuditLog, as: 'audit_logs' },
+    { model: ShipmentDocument, as: 'documents', separate: true },
+    { model: ShipmentTrace, as: 'traces', separate: true },
+    { model: ShipmentProvider, as: 'providers', separate: true },
+    { model: ShipmentTask, as: 'tasks', separate: true },
+    { model: ShipmentDimension, as: 'dimensions', separate: true },
+    { model: ShipmentCost, as: 'costs', separate: true },
+    { model: ShipmentSale, as: 'sales', separate: true },
+    { model: CustomerInvoice, as: 'customer_invoices', separate: true },
+    { model: VendorInvoice, as: 'vendor_invoices', separate: true },
+    { model: FinancialSupport, as: 'financial_supports', separate: true },
+    { model: ShipmentAuditLog, as: 'audit_logs', separate: true },
+  ]
+}
+
+function shipmentFinancialIncludes() {
+  return [
+    {
+      model: Quotation,
+      as: 'quotation',
+      attributes: ['id', 'currency'],
+      include: [
+        {
+          model: QuotationProviderQuote,
+          as: 'provider_quotes',
+          separate: true,
+          attributes: [
+            'id',
+            'provider_id',
+            'provider_name',
+            'service_code',
+            'currency',
+            'quoted_value',
+            'notes',
+          ],
+        },
+        {
+          model: QuotationSale,
+          as: 'sales',
+          separate: true,
+          attributes: [
+            'id',
+            'customer_id',
+            'concept',
+            'currency',
+            'quantity',
+            'unit_value',
+            'subtotal',
+            'tax',
+            'total',
+            'notes',
+          ],
+        },
+      ],
+    },
+    {
+      model: ShipmentCost,
+      as: 'costs',
+      separate: true,
+      attributes: [
+        'id',
+        'vendor_id',
+        'concept',
+        'cost_type',
+        'currency',
+        'quantity',
+        'unit_value',
+        'subtotal',
+        'tax',
+        'total',
+        'status',
+        'is_estimated',
+        'is_final',
+        'notes',
+        'vendor_invoice_id',
+      ],
+    },
+    {
+      model: ShipmentSale,
+      as: 'sales',
+      separate: true,
+      attributes: [
+        'id',
+        'customer_id',
+        'concept',
+        'currency',
+        'quantity',
+        'unit_value',
+        'subtotal',
+        'tax',
+        'total',
+        'status',
+        'notes',
+        'customer_invoice_id',
+      ],
+    },
+    {
+      model: CustomerInvoice,
+      as: 'customer_invoices',
+      separate: true,
+      attributes: [
+        'id',
+        'customer_id',
+        'invoice_number',
+        'currency',
+        'subtotal',
+        'taxes',
+        'total',
+        'paid_amount',
+        'balance',
+        'payment_status',
+        'payment_date',
+        'invoice_date',
+        'due_date',
+        'support_file_url',
+      ],
+    },
+    {
+      model: VendorInvoice,
+      as: 'vendor_invoices',
+      separate: true,
+      attributes: [
+        'id',
+        'vendor_id',
+        'invoice_number',
+        'currency',
+        'subtotal',
+        'taxes',
+        'total',
+        'paid_amount',
+        'balance',
+        'payment_status',
+        'payment_date',
+        'invoice_date',
+        'due_date',
+        'support_file_url',
+      ],
+    },
   ]
 }
 
@@ -223,6 +372,7 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
       customer_id: quotation.customer_id,
       project_external_id: quotation.project_external_id,
       project_name: quotation.project_name,
+      line_key: quotation.line_key || 'fastway',
       subject: quotation.subject,
       transport_mode: quotation.transport_mode,
       modality: quotation.modality,
@@ -275,6 +425,9 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
 async function listShipments(query) {
   const { page, limit, offset } = buildPagination(query.page, query.limit)
   const where = {}
+  const includeDetails = ['1', 'true', 'si', 'yes'].includes(
+    String(query.include_details || '').trim().toLowerCase()
+  )
   const includeTerminal = ['1', 'true', 'si', 'yes'].includes(
     String(query.include_terminal || '').trim().toLowerCase()
   )
@@ -298,14 +451,19 @@ async function listShipments(query) {
   const createdAtWhere = buildCreatedAtWhere(query)
   if (createdAtWhere) where.created_at = createdAtWhere
 
-  const { count, rows } = await Shipment.findAndCountAll({
+  const queryOptions = {
     where,
-    include: shipmentIncludes(),
     order: [['created_at', 'DESC']],
     limit,
     offset,
-    distinct: true,
-  })
+  }
+
+  if (includeDetails) {
+    queryOptions.include = shipmentDetailIncludes()
+    queryOptions.distinct = true
+  }
+
+  const { count, rows } = await Shipment.findAndCountAll(queryOptions)
 
   return {
     total: count,
@@ -315,10 +473,37 @@ async function listShipments(query) {
   }
 }
 
-async function getShipmentById(id) {
-  return Shipment.findByPk(id, {
-    include: shipmentIncludes(),
+async function getShipmentById(id, query = {}) {
+  const detailMode = String(query.detail_mode || '').trim().toLowerCase()
+  const shipment = await Shipment.findByPk(id, {
+    include:
+      detailMode === 'financial'
+        ? shipmentFinancialIncludes()
+        : shipmentDetailIncludes(),
   })
+  if (!shipment) return null
+
+  const customerInvoices = Array.isArray(shipment.customer_invoices)
+    ? shipment.customer_invoices
+    : []
+  const vendorInvoices = Array.isArray(shipment.vendor_invoices)
+    ? shipment.vendor_invoices
+    : []
+  const customerInvoiced = customerInvoices.length
+    ? customerInvoices.some(hasInvoiceAttachment)
+    : Boolean(shipment.customer_invoiced)
+  const vendorInvoiced = vendorInvoices.length
+    ? vendorInvoices.some(hasInvoiceAttachment)
+    : Boolean(shipment.vendor_invoiced)
+
+  shipment.setDataValue('customer_invoiced', customerInvoiced)
+  shipment.setDataValue('vendor_invoiced', vendorInvoiced)
+  shipment.setDataValue(
+    'financial_status',
+    deriveFinancialStatus(shipment.financial_status, customerInvoiced, vendorInvoiced)
+  )
+
+  return shipment
 }
 
 async function createShipment(data, userId) {
@@ -328,6 +513,9 @@ async function createShipment(data, userId) {
     const shipment = await Shipment.create(
       {
         ...data,
+        closure_status: deriveClosureStatusFromOperationalStatus(
+          data.operational_status || 'CREADA'
+        ),
         created_by: userId,
         updated_by: userId,
         created_at: new Date(),
@@ -383,6 +571,9 @@ async function updateShipment(id, data, userId) {
     await shipment.update(
       {
         ...data,
+        closure_status: deriveClosureStatusFromOperationalStatus(
+          data.operational_status || shipment.operational_status
+        ),
         updated_by: userId,
         updated_at: new Date(),
       },
@@ -490,6 +681,28 @@ async function closeFinancialShipment(id, userId) {
       throw error
     }
 
+    const customerInvoices = await CustomerInvoice.findAll({
+      where: { shipment_id: id },
+      transaction,
+    })
+    const vendorInvoices = await VendorInvoice.findAll({
+      where: { shipment_id: id },
+      transaction,
+    })
+
+    const customerInvoiced =
+      customerInvoices.length > 0 && customerInvoices.some(hasInvoiceAttachment)
+    const vendorInvoiced =
+      vendorInvoices.length > 0 && vendorInvoices.some(hasInvoiceAttachment)
+
+    if (!customerInvoiced || !vendorInvoiced) {
+      const error = new Error(
+        'El cierre financiero requiere factura cliente y factura proveedor con archivo cargado'
+      )
+      error.status = 400
+      throw error
+    }
+
     const profitability = await recalculateShipmentProfitability(id, transaction)
 
     await shipment.update(
@@ -581,7 +794,7 @@ async function closeShipment(id, userId) {
 }
 
 module.exports = {
-  shipmentIncludes,
+  shipmentDetailIncludes,
   createShipmentFromQuotation,
   listShipments,
   getShipmentById,

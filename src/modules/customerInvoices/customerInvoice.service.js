@@ -3,8 +3,15 @@ const { createAuditLog } = require('../../utils/audit')
 const Shipment = require('../shipments/shipment.model')
 const ShipmentSale = require('../shipmentSales/shipmentSale.model')
 const CustomerInvoice = require('./customerInvoice.model')
+const { syncShipmentFinancialState } = require('../shipments/shipmentFinancialState.service')
 
-async function syncInvoiceSales(invoiceId, saleIds, transaction) {
+function resolveSaleStatus(paymentStatus) {
+  return String(paymentStatus || '').trim().toUpperCase() === 'PAGADA'
+    ? 'PAGADO'
+    : 'FACTURADO'
+}
+
+async function syncInvoiceSales(invoiceId, saleIds, paymentStatus, transaction) {
   if (!Array.isArray(saleIds)) return
 
   await ShipmentSale.update(
@@ -15,7 +22,11 @@ async function syncInvoiceSales(invoiceId, saleIds, transaction) {
   if (!saleIds.length) return
 
   await ShipmentSale.update(
-    { customer_invoice_id: invoiceId, status: 'FACTURADO', updated_at: new Date() },
+    {
+      customer_invoice_id: invoiceId,
+      status: resolveSaleStatus(paymentStatus),
+      updated_at: new Date(),
+    },
     { where: { id: saleIds }, transaction }
   )
 }
@@ -43,16 +54,22 @@ async function createCustomerInvoice(shipmentId, data, userId) {
       { transaction }
     )
 
-    await syncInvoiceSales(invoice.id, data.sale_ids, transaction)
+    await syncInvoiceSales(
+      invoice.id,
+      data.sale_ids,
+      data.payment_status,
+      transaction
+    )
 
     await shipment.update(
       {
-        financial_status: 'FACTURADA_CLIENTE',
         updated_by: userId,
         updated_at: new Date(),
       },
       { transaction }
     )
+
+    await syncShipmentFinancialState(shipmentId, transaction)
 
     await createAuditLog({
       shipment_id: shipmentId,
@@ -94,7 +111,14 @@ async function updateCustomerInvoice(id, data, userId) {
       { transaction }
     )
 
-    await syncInvoiceSales(invoice.id, data.sale_ids, transaction)
+    await syncInvoiceSales(
+      invoice.id,
+      data.sale_ids,
+      data.payment_status || invoice.payment_status,
+      transaction
+    )
+
+    await syncShipmentFinancialState(invoice.shipment_id, transaction)
 
     await createAuditLog({
       shipment_id: invoice.shipment_id,

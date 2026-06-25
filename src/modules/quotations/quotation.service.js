@@ -14,6 +14,34 @@ const {
   getShipmentById,
 } = require('../shipments/shipment.service')
 
+function normalizeNullableDecimal(value) {
+  if (value === undefined || value === null) return null
+  if (typeof value === 'string' && value.trim() === '') return null
+  return value
+}
+
+function normalizeLineKey(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+
+  return ['fastway', 'harvest', 'greenway'].includes(normalized)
+    ? normalized
+    : undefined
+}
+
+function sanitizeQuotationPayload(data = {}) {
+  const normalizedLineKey = normalizeLineKey(data.line_key)
+
+  return {
+    ...data,
+    ...(normalizedLineKey ? { line_key: normalizedLineKey } : {}),
+    declared_value: normalizeNullableDecimal(data.declared_value),
+    cif_value: normalizeNullableDecimal(data.cif_value),
+    trm: normalizeNullableDecimal(data.trm),
+  }
+}
+
 async function syncQuotationServices(quotationId, services, transaction) {
   if (!Array.isArray(services)) return
 
@@ -140,9 +168,11 @@ async function createQuotation(data, userId) {
   const transaction = await sequelize.transaction()
 
   try {
+    const sanitizedData = sanitizeQuotationPayload(data)
+
     const quotation = await Quotation.create(
       {
-        ...data,
+        ...sanitizedData,
         created_by: userId,
         updated_by: userId,
         created_at: new Date(),
@@ -151,7 +181,7 @@ async function createQuotation(data, userId) {
       { transaction }
     )
 
-    await syncQuotationServices(quotation.id, data.services || [], transaction)
+    await syncQuotationServices(quotation.id, sanitizedData.services || [], transaction)
 
     await createAuditLog({
       entity_type: 'quotation',
@@ -159,7 +189,7 @@ async function createQuotation(data, userId) {
       action: 'CREACION_CT',
       new_values: {
         ...quotation.toJSON(),
-        services: data.services || [],
+        services: sanitizedData.services || [],
       },
       user_id: userId,
       transaction,
@@ -177,6 +207,7 @@ async function updateQuotation(id, data, userId) {
   const transaction = await sequelize.transaction()
 
   try {
+    const sanitizedData = sanitizeQuotationPayload(data)
     const quotation = await Quotation.findByPk(id, { transaction })
     if (!quotation) {
       const error = new Error('Cotización no encontrada')
@@ -190,15 +221,15 @@ async function updateQuotation(id, data, userId) {
 
     await quotation.update(
       {
-        ...data,
+        ...sanitizedData,
         updated_by: userId,
         updated_at: new Date(),
       },
       { transaction }
     )
 
-    if (Array.isArray(data.services)) {
-      await syncQuotationServices(id, data.services, transaction)
+    if (Array.isArray(sanitizedData.services)) {
+      await syncQuotationServices(id, sanitizedData.services, transaction)
     }
 
     await createAuditLog({
@@ -208,7 +239,7 @@ async function updateQuotation(id, data, userId) {
       old_values: before,
       new_values: {
         ...quotation.toJSON(),
-        services: data.services,
+        services: sanitizedData.services,
       },
       user_id: userId,
       transaction,

@@ -126,6 +126,7 @@ exports.createDocument = async (req, res, next) => {
       {
         document_type: req.body.document_type,
         document_name: req.body.document_name || req.file?.originalname || 'Documento CT',
+        package_name: req.body.package_name || null,
         file_url: fileUrl,
         file_size: req.file?.size || null,
         mime_type: req.file?.mimetype || null,

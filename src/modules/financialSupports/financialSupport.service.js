@@ -2,6 +2,7 @@ const { sequelize } = require('../../config/db')
 const { createAuditLog } = require('../../utils/audit')
 const Shipment = require('../shipments/shipment.model')
 const FinancialSupport = require('./financialSupport.model')
+const { syncShipmentFinancialState } = require('../shipments/shipmentFinancialState.service')
 
 async function createFinancialSupport(shipmentId, data, userId) {
   const transaction = await sequelize.transaction()
@@ -35,6 +36,8 @@ async function createFinancialSupport(shipmentId, data, userId) {
       transaction,
     })
 
+    await syncShipmentFinancialState(shipmentId, transaction)
+
     await transaction.commit()
     return support
   } catch (error) {
@@ -67,6 +70,8 @@ async function deleteFinancialSupport(id, userId) {
       user_id: userId,
       transaction,
     })
+
+    await syncShipmentFinancialState(support.shipment_id, transaction)
 
     await transaction.commit()
     return before

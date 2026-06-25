@@ -10,6 +10,10 @@ const {
 } = require('../../utils/logisticsEnums')
 
 const commonQuotationRules = [
+  body('line_key')
+    .optional({ values: 'falsy' })
+    .isIn(['fastway', 'harvest', 'greenway'])
+    .withMessage('line_key debe ser uno de: fastway, harvest, greenway'),
   body('lead_external_id')
     .optional({ values: 'falsy' })
     .isString()
@@ -92,6 +96,12 @@ const commonQuotationRules = [
 ]
 
 exports.validateCreate = [
+  body('line_key')
+    .exists()
+    .withMessage('line_key es requerido')
+    .bail()
+    .isIn(['fastway', 'harvest', 'greenway'])
+    .withMessage('line_key debe ser uno de: fastway, harvest, greenway'),
   body('lead_external_id').exists().withMessage('lead_external_id es requerido').bail().isString(),
   body('customer_id').exists().withMessage('customer_id es requerido').bail().isString(),
   body('subject').exists().withMessage('subject es requerido').bail().isString(),

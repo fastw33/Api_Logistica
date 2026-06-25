@@ -37,6 +37,11 @@ const Shipment = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
+    line_key: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'fastway',
+    },
     do_number: {
       type: DataTypes.STRING(50),
       allowNull: true,

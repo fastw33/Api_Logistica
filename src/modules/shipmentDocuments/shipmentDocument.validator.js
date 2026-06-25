@@ -10,6 +10,7 @@ exports.validateCreate = [
     .isIn(SHIPMENT_DOCUMENT_TYPES)
     .withMessage(`document_type debe ser uno de: ${SHIPMENT_DOCUMENT_TYPES.join(', ')}`),
   body('document_name').optional({ nullable: true }).isString().withMessage('document_name debe ser string'),
+  body('package_name').optional({ nullable: true }).isString().withMessage('package_name debe ser string'),
   body('quotation_id').optional({ nullable: true }).isInt().withMessage('quotation_id debe ser entero'),
   body('file_url').optional({ nullable: true }).isString().withMessage('file_url debe ser string'),
 ]

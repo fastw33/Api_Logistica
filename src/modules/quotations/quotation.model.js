@@ -32,6 +32,11 @@ const Quotation = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
+    line_key: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'fastway',
+    },
     subject: {
       type: DataTypes.STRING(255),
       allowNull: false,
