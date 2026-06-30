@@ -12,6 +12,7 @@ const QuotationService = require('../quotationServices/quotationService.model')
 const QuotationDocument = require('../quotationDocuments/quotationDocument.model')
 const QuotationProviderQuote = require('../quotationProviderQuotes/quotationProviderQuote.model')
 const QuotationSale = require('../quotationSales/quotationSale.model')
+const QuotationDimension = require('../quotationDimensions/quotationDimension.model')
 const Shipment = require('./shipment.model')
 const ShipmentDocument = require('../shipmentDocuments/shipmentDocument.model')
 const ShipmentTrace = require('../shipmentTraces/shipmentTrace.model')
@@ -22,8 +23,233 @@ const ShipmentCost = require('../shipmentCosts/shipmentCost.model')
 const ShipmentSale = require('../shipmentSales/shipmentSale.model')
 const CustomerInvoice = require('../customerInvoices/customerInvoice.model')
 const VendorInvoice = require('../vendorInvoices/vendorInvoice.model')
-const FinancialSupport = require('../financialSupports/financialSupport.model')
 const ShipmentAuditLog = require('../shipmentAuditLogs/shipmentAuditLog.model')
+const {
+  assertClientHasRequiredDocuments,
+  assertQuotationThirdPartiesReady,
+} = require('../../utils/wmsDocumentRequirements')
+
+const SHIPMENT_LIST_ATTRIBUTES = [
+  'id',
+  'quotation_id',
+  'customer_id',
+  'project_name',
+  'line_key',
+  'do_number',
+  'subject',
+  'operational_status',
+  'financial_status',
+  'customer_invoiced',
+  'vendor_invoiced',
+  'created_at',
+]
+
+const SHIPMENT_DETAIL_ATTRIBUTES = [
+  'id',
+  'quotation_id',
+  'lead_external_id',
+  'customer_id',
+  'project_external_id',
+  'project_name',
+  'line_key',
+  'do_number',
+  'file_number',
+  'subject',
+  'transport_mode',
+  'modality',
+  'business_type',
+  'material_class',
+  'operational_status',
+  'financial_status',
+  'closure_status',
+  'incoterm',
+  'origin_country',
+  'origin_city',
+  'origin_port',
+  'origin_address',
+  'destination_country',
+  'destination_city',
+  'destination_port',
+  'destination_address',
+  'declared_value',
+  'cif_value',
+  'currency',
+  'trm',
+  'estimated_profit',
+  'real_profit',
+  'customer_invoiced',
+  'vendor_invoiced',
+  'cargo_description',
+  'etd',
+  'eta',
+  'release_date',
+  'transit_days',
+  'commercial_id',
+  'operator_id',
+  'created_at',
+  'updated_at',
+]
+
+const SHIPMENT_RELATED_QUOTATION_ATTRIBUTES = ['id', 'currency']
+const SHIPMENT_DOCUMENT_ATTRIBUTES = [
+  'id',
+  'quotation_id',
+  'document_type',
+  'document_name',
+  'package_name',
+  'file_url',
+  'file_size',
+  'mime_type',
+  'created_at',
+]
+const SHIPMENT_TRACE_ATTRIBUTES = [
+  'id',
+  'trace_type',
+  'title',
+  'note',
+  'event_at',
+  'created_by',
+  'created_at',
+]
+const SHIPMENT_PROVIDER_ATTRIBUTES = [
+  'id',
+  'provider_id',
+  'provider_name',
+  'provider_type',
+  'service_code',
+  'contact_name',
+  'contact_email',
+  'notes',
+]
+const SHIPMENT_TASK_ATTRIBUTES = [
+  'id',
+  'title',
+  'description',
+  'assigned_to',
+  'status',
+  'priority',
+  'due_date',
+  'completed_at',
+]
+const SHIPMENT_DIMENSION_ATTRIBUTES = [
+  'id',
+  'quantity',
+  'package_type',
+  'gross_weight',
+  'volumetric_weight',
+  'volume_cbm',
+  'length',
+  'width',
+  'height',
+  'dimension_unit',
+  'notes',
+]
+const SHIPMENT_COST_ATTRIBUTES = [
+  'id',
+  'vendor_id',
+  'concept',
+  'cost_type',
+  'currency',
+  'quantity',
+  'unit_value',
+  'subtotal',
+  'tax',
+  'total',
+  'is_estimated',
+  'is_final',
+  'vendor_invoice_id',
+  'status',
+  'notes',
+]
+const SHIPMENT_SALE_ATTRIBUTES = [
+  'id',
+  'customer_id',
+  'concept',
+  'currency',
+  'quantity',
+  'unit_value',
+  'subtotal',
+  'tax',
+  'total',
+  'customer_invoice_id',
+  'status',
+  'notes',
+]
+const CUSTOMER_INVOICE_ATTRIBUTES = [
+  'id',
+  'invoice_number',
+  'customer_id',
+  'currency',
+  'subtotal',
+  'taxes',
+  'total',
+  'paid_amount',
+  'balance',
+  'payment_status',
+  'payment_date',
+  'invoice_date',
+  'due_date',
+  'pdf_url',
+  'xml_url',
+  'support_file_url',
+]
+const VENDOR_INVOICE_ATTRIBUTES = [
+  'id',
+  'invoice_number',
+  'vendor_id',
+  'currency',
+  'subtotal',
+  'taxes',
+  'total',
+  'paid_amount',
+  'balance',
+  'payment_status',
+  'payment_date',
+  'invoice_date',
+  'due_date',
+  'pdf_url',
+  'xml_url',
+  'support_file_url',
+]
+const SHIPMENT_AUDIT_ATTRIBUTES = [
+  'id',
+  'action',
+  'old_values',
+  'new_values',
+  'user_id',
+  'created_at',
+]
+const QUOTATION_DOCUMENT_ATTRIBUTES = [
+  'id',
+  'document_type',
+  'document_name',
+  'package_name',
+  'file_url',
+  'file_size',
+  'mime_type',
+  'created_at',
+]
+const QUOTATION_PROVIDER_QUOTE_ATTRIBUTES = [
+  'id',
+  'provider_id',
+  'provider_name',
+  'service_code',
+  'currency',
+  'quoted_value',
+  'notes',
+]
+const QUOTATION_SALE_ATTRIBUTES = [
+  'id',
+  'customer_id',
+  'concept',
+  'currency',
+  'quantity',
+  'unit_value',
+  'subtotal',
+  'tax',
+  'total',
+  'notes',
+]
 
 function hasInvoiceAttachment(invoice) {
   return Boolean(invoice?.support_file_url || invoice?.pdf_url || invoice?.xml_url)
@@ -192,29 +418,141 @@ async function seedShipmentCommercialBase(shipment, quotation, userId, transacti
   }
 }
 
+async function seedShipmentDimensionsFromQuotation(
+  shipment,
+  quotation,
+  transaction
+) {
+  const quotationDimensions = Array.isArray(quotation?.dimensions)
+    ? quotation.dimensions
+    : await QuotationDimension.findAll({
+        where: { quotation_id: quotation.id },
+        transaction,
+      })
+
+  const sanitizedDimensions = quotationDimensions
+    .map(item => ({
+      quantity: item?.quantity,
+      package_type: item?.package_type || null,
+      gross_weight: item?.gross_weight || null,
+      volumetric_weight: item?.volumetric_weight || null,
+      volume_cbm: item?.volume_cbm || null,
+      length: item?.length || null,
+      width: item?.width || null,
+      height: item?.height || null,
+      dimension_unit:
+        String(item?.dimension_unit || '').trim().toLowerCase() === 'm'
+          ? 'm'
+          : 'cm',
+      notes: item?.notes || null,
+    }))
+    .filter(
+      item =>
+        item.quantity !== undefined &&
+        item.quantity !== null &&
+        String(item.quantity).trim() !== ''
+    )
+
+  if (!sanitizedDimensions.length) return
+
+  await ShipmentDimension.bulkCreate(
+    sanitizedDimensions.map(item => ({
+      shipment_id: shipment.id,
+      ...item,
+      created_at: new Date(),
+      updated_at: new Date(),
+    })),
+    { transaction }
+  )
+}
+
 function shipmentDetailIncludes() {
   return [
     {
       model: Quotation,
       as: 'quotation',
+      attributes: SHIPMENT_RELATED_QUOTATION_ATTRIBUTES,
       include: [
-        { model: QuotationService, as: 'services', separate: true },
-        { model: QuotationDocument, as: 'documents', separate: true },
-        { model: QuotationProviderQuote, as: 'provider_quotes', separate: true },
-        { model: QuotationSale, as: 'sales', separate: true },
+        {
+          model: QuotationDocument,
+          as: 'documents',
+          attributes: QUOTATION_DOCUMENT_ATTRIBUTES,
+          separate: true,
+        },
+        {
+          model: QuotationProviderQuote,
+          as: 'provider_quotes',
+          attributes: QUOTATION_PROVIDER_QUOTE_ATTRIBUTES,
+          separate: true,
+        },
+        {
+          model: QuotationSale,
+          as: 'sales',
+          attributes: QUOTATION_SALE_ATTRIBUTES,
+          separate: true,
+        },
       ],
     },
-    { model: ShipmentDocument, as: 'documents', separate: true },
-    { model: ShipmentTrace, as: 'traces', separate: true },
-    { model: ShipmentProvider, as: 'providers', separate: true },
-    { model: ShipmentTask, as: 'tasks', separate: true },
-    { model: ShipmentDimension, as: 'dimensions', separate: true },
-    { model: ShipmentCost, as: 'costs', separate: true },
-    { model: ShipmentSale, as: 'sales', separate: true },
-    { model: CustomerInvoice, as: 'customer_invoices', separate: true },
-    { model: VendorInvoice, as: 'vendor_invoices', separate: true },
-    { model: FinancialSupport, as: 'financial_supports', separate: true },
-    { model: ShipmentAuditLog, as: 'audit_logs', separate: true },
+    {
+      model: ShipmentDocument,
+      as: 'documents',
+      attributes: SHIPMENT_DOCUMENT_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: ShipmentTrace,
+      as: 'traces',
+      attributes: SHIPMENT_TRACE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: ShipmentProvider,
+      as: 'providers',
+      attributes: SHIPMENT_PROVIDER_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: ShipmentTask,
+      as: 'tasks',
+      attributes: SHIPMENT_TASK_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: ShipmentDimension,
+      as: 'dimensions',
+      attributes: SHIPMENT_DIMENSION_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: ShipmentCost,
+      as: 'costs',
+      attributes: SHIPMENT_COST_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: ShipmentSale,
+      as: 'sales',
+      attributes: SHIPMENT_SALE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: CustomerInvoice,
+      as: 'customer_invoices',
+      attributes: CUSTOMER_INVOICE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: VendorInvoice,
+      as: 'vendor_invoices',
+      attributes: VENDOR_INVOICE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: ShipmentAuditLog,
+      as: 'audit_logs',
+      attributes: SHIPMENT_AUDIT_ATTRIBUTES,
+      separate: true,
+    },
   ]
 }
 
@@ -303,43 +641,13 @@ function shipmentFinancialIncludes() {
       model: CustomerInvoice,
       as: 'customer_invoices',
       separate: true,
-      attributes: [
-        'id',
-        'customer_id',
-        'invoice_number',
-        'currency',
-        'subtotal',
-        'taxes',
-        'total',
-        'paid_amount',
-        'balance',
-        'payment_status',
-        'payment_date',
-        'invoice_date',
-        'due_date',
-        'support_file_url',
-      ],
+      attributes: CUSTOMER_INVOICE_ATTRIBUTES,
     },
     {
       model: VendorInvoice,
       as: 'vendor_invoices',
       separate: true,
-      attributes: [
-        'id',
-        'vendor_id',
-        'invoice_number',
-        'currency',
-        'subtotal',
-        'taxes',
-        'total',
-        'paid_amount',
-        'balance',
-        'payment_status',
-        'payment_date',
-        'invoice_date',
-        'due_date',
-        'support_file_url',
-      ],
+      attributes: VENDOR_INVOICE_ATTRIBUTES,
     },
   ]
 }
@@ -403,6 +711,7 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
 
   await assignShipmentNumbers(shipment, transaction)
   await seedShipmentCommercialBase(shipment, quotation, userId, transaction)
+  await seedShipmentDimensionsFromQuotation(shipment, quotation, transaction)
 
   await createAuditLog({
     shipment_id: shipment.id,
@@ -453,6 +762,7 @@ async function listShipments(query) {
 
   const queryOptions = {
     where,
+    attributes: SHIPMENT_LIST_ATTRIBUTES,
     order: [['created_at', 'DESC']],
     limit,
     offset,
@@ -476,6 +786,7 @@ async function listShipments(query) {
 async function getShipmentById(id, query = {}) {
   const detailMode = String(query.detail_mode || '').trim().toLowerCase()
   const shipment = await Shipment.findByPk(id, {
+    attributes: SHIPMENT_DETAIL_ATTRIBUTES,
     include:
       detailMode === 'financial'
         ? shipmentFinancialIncludes()
@@ -507,6 +818,8 @@ async function getShipmentById(id, query = {}) {
 }
 
 async function createShipment(data, userId) {
+  await assertClientHasRequiredDocuments(data.customer_id)
+
   const transaction = await sequelize.transaction()
 
   try {
@@ -629,11 +942,31 @@ async function updateShipment(id, data, userId) {
 }
 
 async function convertQuotationToShipment(quotationId, userId) {
+  const quotationForValidation = await Quotation.findByPk(quotationId, {
+    include: [
+      { model: QuotationService, as: 'services' },
+      { model: QuotationProviderQuote, as: 'provider_quotes' },
+      { model: QuotationDimension, as: 'dimensions' },
+    ],
+  })
+
+  if (!quotationForValidation) {
+    const error = new Error('Cotización no encontrada')
+    error.status = 404
+    throw error
+  }
+
+  await assertQuotationThirdPartiesReady(quotationForValidation)
+
   const transaction = await sequelize.transaction()
 
   try {
     const quotation = await Quotation.findByPk(quotationId, {
-      include: [{ model: QuotationService, as: 'services' }],
+      include: [
+        { model: QuotationService, as: 'services' },
+        { model: QuotationProviderQuote, as: 'provider_quotes' },
+        { model: QuotationDimension, as: 'dimensions' },
+      ],
       transaction,
     })
 

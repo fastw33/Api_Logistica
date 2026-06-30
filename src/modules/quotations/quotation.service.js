@@ -8,11 +8,190 @@ const QuotationDocument = require('../quotationDocuments/quotationDocument.model
 const QuotationProviderQuote = require('../quotationProviderQuotes/quotationProviderQuote.model')
 const QuotationSale = require('../quotationSales/quotationSale.model')
 const QuotationTrace = require('../quotationTraces/quotationTrace.model')
+const QuotationDimension = require('../quotationDimensions/quotationDimension.model')
 const Shipment = require('../shipments/shipment.model')
 const {
   createShipmentFromQuotation,
   getShipmentById,
 } = require('../shipments/shipment.service')
+const {
+  assertQuotationThirdPartiesReady,
+} = require('../../utils/wmsDocumentRequirements')
+
+const QUOTATION_LIST_ATTRIBUTES = [
+  'id',
+  'lead_external_id',
+  'customer_id',
+  'project_external_id',
+  'project_name',
+  'line_key',
+  'subject',
+  'transport_mode',
+  'modality',
+  'business_type',
+  'material_class',
+  'status',
+  'closure_status',
+  'commercial_id',
+  'created_at',
+  'updated_at',
+]
+
+const QUOTATION_DETAIL_ATTRIBUTES = [
+  'id',
+  'lead_external_id',
+  'customer_id',
+  'project_external_id',
+  'project_name',
+  'line_key',
+  'subject',
+  'transport_mode',
+  'modality',
+  'business_type',
+  'material_class',
+  'declared_value',
+  'cif_value',
+  'currency',
+  'trm',
+  'origin_country',
+  'origin_city',
+  'origin_port',
+  'origin_address',
+  'destination_country',
+  'destination_city',
+  'destination_port',
+  'destination_address',
+  'incoterm',
+  'commercial_id',
+  'status',
+  'closure_status',
+  'next_review_date',
+  'cargo_description',
+  'notes',
+  'created_at',
+  'updated_at',
+]
+
+const SHIPMENT_REFERENCE_ATTRIBUTES = [
+  'id',
+  'quotation_id',
+  'do_number',
+  'operational_status',
+  'closure_status',
+  'created_at',
+]
+
+const QUOTATION_SERVICE_ATTRIBUTES = ['id', 'service_code', 'enabled']
+const QUOTATION_DOCUMENT_ATTRIBUTES = [
+  'id',
+  'document_type',
+  'document_name',
+  'package_name',
+  'file_url',
+  'file_size',
+  'mime_type',
+  'created_at',
+]
+const QUOTATION_PROVIDER_QUOTE_ATTRIBUTES = [
+  'id',
+  'provider_id',
+  'provider_name',
+  'service_code',
+  'currency',
+  'quoted_value',
+  'quoted_trm',
+  'validity_date',
+  'notes',
+  'created_at',
+]
+const QUOTATION_SALE_ATTRIBUTES = [
+  'id',
+  'customer_id',
+  'concept',
+  'currency',
+  'quantity',
+  'unit_value',
+  'subtotal',
+  'tax',
+  'total',
+  'notes',
+  'created_at',
+]
+const QUOTATION_TRACE_ATTRIBUTES = [
+  'id',
+  'trace_type',
+  'title',
+  'note',
+  'event_at',
+  'created_by',
+  'created_at',
+]
+const QUOTATION_DIMENSION_ATTRIBUTES = [
+  'id',
+  'quantity',
+  'package_type',
+  'gross_weight',
+  'volumetric_weight',
+  'volume_cbm',
+  'length',
+  'width',
+  'height',
+  'dimension_unit',
+  'notes',
+  'created_at',
+]
+
+function quotationListIncludes() {
+  return [
+    {
+      model: Shipment,
+      as: 'shipments',
+      attributes: SHIPMENT_REFERENCE_ATTRIBUTES,
+      separate: true,
+    },
+  ]
+}
+
+function quotationDetailIncludes() {
+  return [
+    {
+      model: QuotationService,
+      as: 'services',
+      attributes: QUOTATION_SERVICE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: QuotationDocument,
+      as: 'documents',
+      attributes: QUOTATION_DOCUMENT_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: QuotationProviderQuote,
+      as: 'provider_quotes',
+      attributes: QUOTATION_PROVIDER_QUOTE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: QuotationSale,
+      as: 'sales',
+      attributes: QUOTATION_SALE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: QuotationTrace,
+      as: 'traces',
+      attributes: QUOTATION_TRACE_ATTRIBUTES,
+      separate: true,
+    },
+    {
+      model: QuotationDimension,
+      as: 'dimensions',
+      attributes: QUOTATION_DIMENSION_ATTRIBUTES,
+      separate: true,
+    },
+  ]
+}
 
 function normalizeNullableDecimal(value) {
   if (value === undefined || value === null) return null
@@ -57,6 +236,50 @@ async function syncQuotationServices(quotationId, services, transaction) {
       quotation_id: quotationId,
       service_code: service.service_code,
       enabled: service.enabled !== undefined ? service.enabled : true,
+      created_at: new Date(),
+      updated_at: new Date(),
+    })),
+    { transaction }
+  )
+}
+
+async function syncQuotationDimensions(quotationId, dimensions, transaction) {
+  if (!Array.isArray(dimensions)) return
+
+  await QuotationDimension.destroy({
+    where: { quotation_id: quotationId },
+    transaction,
+  })
+
+  const sanitizedDimensions = dimensions
+    .map(item => ({
+      quantity: item?.quantity,
+      package_type: item?.package_type || null,
+      gross_weight: item?.gross_weight || null,
+      volumetric_weight: item?.volumetric_weight || null,
+      volume_cbm: item?.volume_cbm || null,
+      length: item?.length || null,
+      width: item?.width || null,
+      height: item?.height || null,
+      dimension_unit:
+        String(item?.dimension_unit || '').trim().toLowerCase() === 'm'
+          ? 'm'
+          : 'cm',
+      notes: item?.notes || null,
+    }))
+    .filter(
+      item =>
+        item.quantity !== undefined &&
+        item.quantity !== null &&
+        String(item.quantity).trim() !== ''
+    )
+
+  if (!sanitizedDimensions.length) return
+
+  await QuotationDimension.bulkCreate(
+    sanitizedDimensions.map(item => ({
+      quotation_id: quotationId,
+      ...item,
       created_at: new Date(),
       updated_at: new Date(),
     })),
@@ -129,14 +352,8 @@ async function listQuotations(query) {
 
   const { count, rows } = await Quotation.findAndCountAll({
     where,
-    include: [
-      { model: QuotationService, as: 'services' },
-      { model: QuotationDocument, as: 'documents' },
-      { model: QuotationProviderQuote, as: 'provider_quotes' },
-      { model: QuotationSale, as: 'sales' },
-      { model: QuotationTrace, as: 'traces' },
-      { model: Shipment, as: 'shipments' },
-    ],
+    attributes: QUOTATION_LIST_ATTRIBUTES,
+    include: quotationListIncludes(),
     order: [['created_at', 'DESC']],
     limit,
     offset,
@@ -153,14 +370,8 @@ async function listQuotations(query) {
 
 async function getQuotationById(id) {
   return Quotation.findByPk(id, {
-    include: [
-      { model: QuotationService, as: 'services' },
-      { model: QuotationDocument, as: 'documents' },
-      { model: QuotationProviderQuote, as: 'provider_quotes' },
-      { model: QuotationSale, as: 'sales' },
-      { model: QuotationTrace, as: 'traces' },
-      { model: Shipment, as: 'shipments' },
-    ],
+    attributes: QUOTATION_DETAIL_ATTRIBUTES,
+    include: quotationDetailIncludes(),
   })
 }
 
@@ -182,6 +393,11 @@ async function createQuotation(data, userId) {
     )
 
     await syncQuotationServices(quotation.id, sanitizedData.services || [], transaction)
+    await syncQuotationDimensions(
+      quotation.id,
+      sanitizedData.dimensions || [],
+      transaction
+    )
 
     await createAuditLog({
       entity_type: 'quotation',
@@ -190,6 +406,7 @@ async function createQuotation(data, userId) {
       new_values: {
         ...quotation.toJSON(),
         services: sanitizedData.services || [],
+        dimensions: sanitizedData.dimensions || [],
       },
       user_id: userId,
       transaction,
@@ -232,6 +449,10 @@ async function updateQuotation(id, data, userId) {
       await syncQuotationServices(id, sanitizedData.services, transaction)
     }
 
+    if (Array.isArray(sanitizedData.dimensions)) {
+      await syncQuotationDimensions(id, sanitizedData.dimensions, transaction)
+    }
+
     await createAuditLog({
       entity_type: 'quotation',
       entity_id: quotation.id,
@@ -240,6 +461,7 @@ async function updateQuotation(id, data, userId) {
       new_values: {
         ...quotation.toJSON(),
         services: sanitizedData.services,
+        dimensions: sanitizedData.dimensions,
       },
       user_id: userId,
       transaction,
@@ -254,6 +476,23 @@ async function updateQuotation(id, data, userId) {
 }
 
 async function approveQuotation(id, userId) {
+  const quotationForValidation = await Quotation.findByPk(id, {
+    include: [
+      { model: QuotationService, as: 'services' },
+      { model: QuotationProviderQuote, as: 'provider_quotes' },
+      { model: QuotationSale, as: 'sales' },
+      { model: QuotationDimension, as: 'dimensions' },
+    ],
+  })
+
+  if (!quotationForValidation) {
+    const error = new Error('Cotización no encontrada')
+    error.status = 404
+    throw error
+  }
+
+  await assertQuotationThirdPartiesReady(quotationForValidation)
+
   const transaction = await sequelize.transaction()
 
   try {
@@ -262,6 +501,7 @@ async function approveQuotation(id, userId) {
         { model: QuotationService, as: 'services' },
         { model: QuotationProviderQuote, as: 'provider_quotes' },
         { model: QuotationSale, as: 'sales' },
+        { model: QuotationDimension, as: 'dimensions' },
       ],
       transaction,
     })

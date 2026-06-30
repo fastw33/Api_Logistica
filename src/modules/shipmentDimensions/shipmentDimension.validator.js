@@ -10,6 +10,10 @@ exports.validateCreate = [
   body('length').optional({ nullable: true }).isDecimal().withMessage('length debe ser numérico'),
   body('width').optional({ nullable: true }).isDecimal().withMessage('width debe ser numérico'),
   body('height').optional({ nullable: true }).isDecimal().withMessage('height debe ser numérico'),
+  body('dimension_unit')
+    .optional({ nullable: true })
+    .isIn(['cm', 'm'])
+    .withMessage('dimension_unit debe ser cm o m'),
   body('notes').optional({ nullable: true }).isString().withMessage('notes debe ser string'),
 ]
 
@@ -23,5 +27,9 @@ exports.validateUpdate = [
   body('length').optional({ nullable: true }).isDecimal().withMessage('length debe ser numérico'),
   body('width').optional({ nullable: true }).isDecimal().withMessage('width debe ser numérico'),
   body('height').optional({ nullable: true }).isDecimal().withMessage('height debe ser numérico'),
+  body('dimension_unit')
+    .optional({ nullable: true })
+    .isIn(['cm', 'm'])
+    .withMessage('dimension_unit debe ser cm o m'),
   body('notes').optional({ nullable: true }).isString().withMessage('notes debe ser string'),
 ]

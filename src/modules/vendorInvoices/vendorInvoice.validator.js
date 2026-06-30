@@ -25,7 +25,6 @@ exports.validateCreate = [
   param('id').isInt().withMessage('ID de shipment inválido'),
   body('vendor_id').exists().withMessage('vendor_id es requerido').bail().isString(),
   body('invoice_number').exists().withMessage('invoice_number es requerido').bail().isString(),
-  body('subtotal').exists().withMessage('subtotal es requerido').bail().isDecimal(),
   body('total').exists().withMessage('total es requerido').bail().isDecimal(),
   ...commonRules,
 ]

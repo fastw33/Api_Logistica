@@ -2,6 +2,26 @@ const jwt = require('jsonwebtoken')
 const jwtConfig = require('../config/jwt')
 
 const authMiddleware = (req, res, next) => {
+  const internalServiceKey = String(process.env.INTERNAL_SERVICE_KEY || '').trim()
+  const incomingInternalKey = String(
+    req.headers['x-internal-service-key'] || ''
+  ).trim()
+
+  if (
+    internalServiceKey &&
+    incomingInternalKey &&
+    incomingInternalKey === internalServiceKey
+  ) {
+    req.usuario = {
+      internal_service: true,
+      id_usuario: null,
+      id_personal: null,
+      permisos: {},
+    }
+    req.personal = null
+    return next()
+  }
+
   const authHeader = req.headers.authorization
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

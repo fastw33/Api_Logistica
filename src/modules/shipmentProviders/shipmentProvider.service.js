@@ -1,9 +1,14 @@
 const { sequelize } = require('../../config/db')
 const { createAuditLog } = require('../../utils/audit')
+const {
+  assertProviderHasRequiredDocuments,
+} = require('../../utils/wmsDocumentRequirements')
 const Shipment = require('../shipments/shipment.model')
 const ShipmentProvider = require('./shipmentProvider.model')
 
 async function createShipmentProvider(shipmentId, data, userId) {
+  await assertProviderHasRequiredDocuments(data.provider_id)
+
   const transaction = await sequelize.transaction()
 
   try {

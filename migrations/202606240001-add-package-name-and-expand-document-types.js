@@ -70,17 +70,28 @@ const PREVIOUS_SHIPMENT_DOCUMENT_TYPES = [
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('quotation_documents', 'package_name', {
-      type: Sequelize.STRING(255),
-      allowNull: true,
-      after: 'document_name',
-    })
+    const quotationDocumentsTable = await queryInterface.describeTable(
+      'quotation_documents'
+    )
+    const shipmentDocumentsTable = await queryInterface.describeTable(
+      'shipment_documents'
+    )
 
-    await queryInterface.addColumn('shipment_documents', 'package_name', {
-      type: Sequelize.STRING(255),
-      allowNull: true,
-      after: 'document_name',
-    })
+    if (!quotationDocumentsTable.package_name) {
+      await queryInterface.addColumn('quotation_documents', 'package_name', {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+        after: 'document_name',
+      })
+    }
+
+    if (!shipmentDocumentsTable.package_name) {
+      await queryInterface.addColumn('shipment_documents', 'package_name', {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+        after: 'document_name',
+      })
+    }
 
     await queryInterface.changeColumn('quotation_documents', 'document_type', {
       type: Sequelize.ENUM(...QUOTATION_DOCUMENT_TYPES),
@@ -104,7 +115,19 @@ module.exports = {
       allowNull: false,
     })
 
-    await queryInterface.removeColumn('quotation_documents', 'package_name')
-    await queryInterface.removeColumn('shipment_documents', 'package_name')
+    const quotationDocumentsTable = await queryInterface.describeTable(
+      'quotation_documents'
+    )
+    const shipmentDocumentsTable = await queryInterface.describeTable(
+      'shipment_documents'
+    )
+
+    if (quotationDocumentsTable.package_name) {
+      await queryInterface.removeColumn('quotation_documents', 'package_name')
+    }
+
+    if (shipmentDocumentsTable.package_name) {
+      await queryInterface.removeColumn('shipment_documents', 'package_name')
+    }
   },
 }

@@ -4,6 +4,7 @@ const QuotationDocument = require('../modules/quotationDocuments/quotationDocume
 const QuotationProviderQuote = require('../modules/quotationProviderQuotes/quotationProviderQuote.model')
 const QuotationSale = require('../modules/quotationSales/quotationSale.model')
 const QuotationTrace = require('../modules/quotationTraces/quotationTrace.model')
+const QuotationDimension = require('../modules/quotationDimensions/quotationDimension.model')
 const ExperimentalQuote = require('../modules/experimentalQuotes/experimentalQuote.model')
 const ExperimentalQuoteItem = require('../modules/experimentalQuoteItems/experimentalQuoteItem.model')
 const ExperimentalQuoteTrace = require('../modules/experimentalQuoteTraces/experimentalQuoteTrace.model')
@@ -61,6 +62,15 @@ Quotation.hasMany(QuotationTrace, {
   as: 'traces',
 })
 QuotationTrace.belongsTo(Quotation, {
+  foreignKey: 'quotation_id',
+  as: 'quotation',
+})
+
+Quotation.hasMany(QuotationDimension, {
+  foreignKey: 'quotation_id',
+  as: 'dimensions',
+})
+QuotationDimension.belongsTo(Quotation, {
   foreignKey: 'quotation_id',
   as: 'quotation',
 })
@@ -216,6 +226,7 @@ module.exports = {
   QuotationProviderQuote,
   QuotationSale,
   QuotationTrace,
+  QuotationDimension,
   ExperimentalQuote,
   ExperimentalQuoteItem,
   ExperimentalQuoteTrace,

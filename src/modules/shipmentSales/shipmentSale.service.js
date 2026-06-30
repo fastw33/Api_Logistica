@@ -1,6 +1,7 @@
 const { sequelize } = require('../../config/db')
 const { createAuditLog } = require('../../utils/audit')
 const { recalculateShipmentProfitability } = require('../../utils/profitability')
+const { buildFlatAmountPayload } = require('../../utils/financialValues')
 const Shipment = require('../shipments/shipment.model')
 const ShipmentSale = require('./shipmentSale.model')
 
@@ -15,9 +16,14 @@ async function createShipmentSale(shipmentId, data, userId) {
       throw error
     }
 
+    const normalizedAmounts = buildFlatAmountPayload(data, {
+      defaultCurrency: shipment.currency || 'COP',
+    })
+
     const sale = await ShipmentSale.create(
       {
         ...data,
+        ...normalizedAmounts,
         shipment_id: shipmentId,
         created_by: userId,
         updated_by: userId,
@@ -62,10 +68,18 @@ async function updateShipmentSale(id, data, userId) {
     }
 
     const before = sale.toJSON()
+    const shipment = await Shipment.findByPk(sale.shipment_id, { transaction })
+    const normalizedAmounts = buildFlatAmountPayload(
+      { ...sale.toJSON(), ...data },
+      {
+        defaultCurrency: shipment?.currency || sale.currency || 'COP',
+      }
+    )
 
     await sale.update(
       {
         ...data,
+        ...normalizedAmounts,
         updated_by: userId,
         updated_at: new Date(),
       },

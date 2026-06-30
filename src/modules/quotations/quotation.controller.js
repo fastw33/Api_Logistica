@@ -2,6 +2,10 @@ const quotationService = require('./quotation.service')
 const { convertQuotationToShipment } = require('../shipments/shipment.service')
 const { createQuotationDocument } = require('../quotationDocuments/quotationDocument.service')
 const {
+  createQuotationPdfBuffer,
+  buildQuotationPdfFilename,
+} = require('../../utils/quotationPdf')
+const {
   createQuotationProviderQuote,
 } = require('../quotationProviderQuotes/quotationProviderQuote.service')
 const { createQuotationSale } = require('../quotationSales/quotationSale.service')
@@ -27,6 +31,26 @@ exports.getQuotationById = async (req, res, next) => {
       return res.status(404).json({ message: 'Cotización no encontrada' })
     }
     res.json(quotation)
+  } catch (error) {
+    next(error)
+  }
+}
+
+exports.downloadQuotationPdf = async (req, res, next) => {
+  try {
+    const quotation = await quotationService.getQuotationById(req.params.id)
+    if (!quotation) {
+      return res.status(404).json({ message: 'Cotización no encontrada' })
+    }
+
+    const pdfBuffer = await createQuotationPdfBuffer(quotation)
+    const filename = buildQuotationPdfFilename(quotation)
+
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Content-Length', pdfBuffer.length)
+
+    return res.send(pdfBuffer)
   } catch (error) {
     next(error)
   }

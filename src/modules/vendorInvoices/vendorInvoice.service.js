@@ -1,5 +1,6 @@
 const { sequelize } = require('../../config/db')
 const { createAuditLog } = require('../../utils/audit')
+const { buildFlatInvoicePayload } = require('../../utils/financialValues')
 const Shipment = require('../shipments/shipment.model')
 const ShipmentCost = require('../shipmentCosts/shipmentCost.model')
 const VendorInvoice = require('./vendorInvoice.model')
@@ -42,9 +43,14 @@ async function createVendorInvoice(shipmentId, data, userId) {
       throw error
     }
 
+    const normalizedAmounts = buildFlatInvoicePayload(data, {
+      defaultCurrency: shipment.currency || 'COP',
+    })
+
     const invoice = await VendorInvoice.create(
       {
         ...data,
+        ...normalizedAmounts,
         shipment_id: shipmentId,
         created_by: userId,
         updated_by: userId,
@@ -101,10 +107,18 @@ async function updateVendorInvoice(id, data, userId) {
     }
 
     const before = invoice.toJSON()
+    const shipment = await Shipment.findByPk(invoice.shipment_id, { transaction })
+    const normalizedAmounts = buildFlatInvoicePayload(
+      { ...invoice.toJSON(), ...data },
+      {
+        defaultCurrency: shipment?.currency || invoice.currency || 'COP',
+      }
+    )
 
     await invoice.update(
       {
         ...data,
+        ...normalizedAmounts,
         updated_by: userId,
         updated_at: new Date(),
       },

@@ -1,14 +1,14 @@
 const { sequelize, DataTypes } = require('../../config/db')
 
-const ShipmentDimension = sequelize.define(
-  'ShipmentDimension',
+const QuotationDimension = sequelize.define(
+  'QuotationDimension',
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
-    shipment_id: {
+    quotation_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
@@ -65,9 +65,9 @@ const ShipmentDimension = sequelize.define(
     },
   },
   {
-    tableName: 'shipment_dimensions',
+    tableName: 'quotation_dimensions',
     timestamps: false,
   }
 )
 
-module.exports = ShipmentDimension
+module.exports = QuotationDimension

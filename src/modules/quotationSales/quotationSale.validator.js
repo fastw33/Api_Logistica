@@ -16,8 +16,6 @@ exports.validateCreate = [
   param('id').isInt().withMessage('ID de quotation inválido'),
   body('customer_id').exists().withMessage('customer_id es requerido').bail().isString(),
   body('concept').exists().withMessage('concept es requerido').bail().isString(),
-  body('unit_value').exists().withMessage('unit_value es requerido').bail().isDecimal(),
-  body('subtotal').exists().withMessage('subtotal es requerido').bail().isDecimal(),
   body('total').exists().withMessage('total es requerido').bail().isDecimal(),
   ...commonRules,
 ]

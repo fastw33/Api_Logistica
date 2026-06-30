@@ -1,5 +1,6 @@
 const { sequelize } = require('../../config/db')
 const { createAuditLog } = require('../../utils/audit')
+const { buildFlatAmountPayload } = require('../../utils/financialValues')
 const Quotation = require('../quotations/quotation.model')
 const QuotationSale = require('./quotationSale.model')
 
@@ -30,17 +31,16 @@ async function createQuotationSale(quotationId, data, userId) {
 
     ensureQuotationEditable(quotation)
 
+    const normalizedAmounts = buildFlatAmountPayload(data, {
+      defaultCurrency: quotation.currency || 'COP',
+    })
+
     const sale = await QuotationSale.create(
       {
         quotation_id: quotationId,
         customer_id: data.customer_id,
         concept: data.concept,
-        currency: data.currency || 'COP',
-        quantity: data.quantity || 1,
-        unit_value: data.unit_value,
-        subtotal: data.subtotal,
-        tax: data.tax || 0,
-        total: data.total,
+        ...normalizedAmounts,
         notes: data.notes || null,
         created_by: userId,
         updated_by: userId,
@@ -82,10 +82,17 @@ async function updateQuotationSale(id, data, userId) {
     ensureQuotationEditable(quotation)
 
     const before = sale.toJSON()
+    const normalizedAmounts = buildFlatAmountPayload(
+      { ...sale.toJSON(), ...data },
+      {
+        defaultCurrency: quotation?.currency || sale.currency || 'COP',
+      }
+    )
 
     await sale.update(
       {
         ...data,
+        ...normalizedAmounts,
         updated_by: userId,
         updated_at: new Date(),
       },
