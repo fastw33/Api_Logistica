@@ -22,8 +22,19 @@ const DOCUMENT_LABELS = {
   tratamiento_datos_personales: 'Tratamiento de datos personales',
 }
 
+const DEFAULT_WMS_API_URL =
+  process.env.NODE_ENV === 'production'
+    ? 'https://api.appfastway.com/api'
+    : 'http://localhost:3000/api'
+
 function normalizeBaseUrl(url) {
-  return String(url || 'http://localhost:3000/api').replace(/\/+$/, '')
+  return String(url || '')
+    .trim()
+    .replace(/\/+$/, '')
+}
+
+function resolveWmsBaseUrl() {
+  return normalizeBaseUrl(process.env.WMS_API_URL) || DEFAULT_WMS_API_URL
 }
 
 function buildWmsHeaders() {
@@ -44,7 +55,7 @@ function buildWmsHeaders() {
 }
 
 async function fetchWmsDocuments(resourcePath, notFoundMessage) {
-  const baseUrl = normalizeBaseUrl(process.env.WMS_API_URL)
+  const baseUrl = resolveWmsBaseUrl()
 
   let response
   try {
