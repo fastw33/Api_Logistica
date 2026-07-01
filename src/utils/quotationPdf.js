@@ -462,7 +462,7 @@ function buildPdfDefinition(quotation) {
                     alignment: 'right',
                   },
                   {
-                    text: `CT ${quotation?.id || '—'}`,
+                    text: quotation?.quotation_number || 'CT',
                     style: 'headerIdTextRight',
                     alignment: 'right',
                   },
@@ -710,8 +710,7 @@ async function createQuotationPdfBuffer(quotation) {
 }
 
 function buildQuotationPdfFilename(quotation) {
-  const id = String(quotation?.id || 'CT').padStart(6, '0')
-  return `CT-${id}.pdf`
+  return `${quotation?.quotation_number || 'CT'}.pdf`
 }
 
 module.exports = {

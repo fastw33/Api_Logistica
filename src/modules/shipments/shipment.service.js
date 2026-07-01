@@ -1,7 +1,7 @@
 const { sequelize } = require('../../config/db')
 const { Op } = require('sequelize')
 const { buildPagination } = require('../../utils/pagination')
-const { buildShipmentNumbers } = require('../../utils/shipmentNumbers')
+const { generateShipmentNumbers } = require('../../utils/shipmentNumbers')
 const { createAuditLog } = require('../../utils/audit')
 const {
   calculateShipmentProfitability,
@@ -90,7 +90,7 @@ const SHIPMENT_DETAIL_ATTRIBUTES = [
   'updated_at',
 ]
 
-const SHIPMENT_RELATED_QUOTATION_ATTRIBUTES = ['id', 'currency']
+const SHIPMENT_RELATED_QUOTATION_ATTRIBUTES = ['id', 'quotation_number', 'currency']
 const SHIPMENT_DOCUMENT_ATTRIBUTES = [
   'id',
   'quotation_id',
@@ -324,6 +324,32 @@ function buildCreatedAtWhere(query = {}) {
   return Reflect.ownKeys(createdAt).length ? createdAt : null
 }
 
+function attachShipmentDerivedNumbers(shipment) {
+  if (!shipment) return shipment
+
+  const quotationNumber =
+    shipment?.quotation?.quotation_number ||
+    shipment?.quotation_number ||
+    null
+
+  if (typeof shipment.setDataValue === 'function') {
+    shipment.setDataValue('quotation_number', quotationNumber)
+  } else {
+    shipment.quotation_number = quotationNumber
+  }
+
+  if (shipment?.quotation && typeof shipment.quotation.setDataValue === 'function') {
+    shipment.quotation.setDataValue('quotation_number', quotationNumber)
+  } else if (shipment?.quotation) {
+    shipment.quotation = {
+      ...shipment.quotation,
+      quotation_number: quotationNumber,
+    }
+  }
+
+  return shipment
+}
+
 async function seedShipmentCommercialBase(shipment, quotation, userId, transaction) {
   const providerQuotes = Array.isArray(quotation?.provider_quotes)
     ? quotation.provider_quotes
@@ -466,6 +492,17 @@ async function seedShipmentDimensionsFromQuotation(
   )
 }
 
+function shipmentListIncludes() {
+  return [
+    {
+      model: Quotation,
+      as: 'quotation',
+      attributes: ['id', 'quotation_number'],
+      required: false,
+    },
+  ]
+}
+
 function shipmentDetailIncludes() {
   return [
     {
@@ -561,7 +598,7 @@ function shipmentFinancialIncludes() {
     {
       model: Quotation,
       as: 'quotation',
-      attributes: ['id', 'currency'],
+      attributes: ['id', 'quotation_number', 'currency'],
       include: [
         {
           model: QuotationProviderQuote,
@@ -652,19 +689,6 @@ function shipmentFinancialIncludes() {
   ]
 }
 
-async function assignShipmentNumbers(shipment, transaction) {
-  const numbers = buildShipmentNumbers(shipment.id)
-  await shipment.update(
-    {
-      do_number: numbers.do_number,
-      file_number: numbers.file_number,
-      updated_at: new Date(),
-    },
-    { transaction }
-  )
-  return shipment
-}
-
 async function createShipmentFromQuotation(quotation, userId, transaction) {
   const existing = await Shipment.findOne({
     where: { quotation_id: quotation.id },
@@ -672,6 +696,8 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
   })
 
   if (existing) return existing
+
+  const numbers = await generateShipmentNumbers(transaction)
 
   const shipment = await Shipment.create(
     {
@@ -701,6 +727,8 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
       trm: quotation.trm,
       cargo_description: quotation.cargo_description,
       commercial_id: quotation.commercial_id,
+      do_number: numbers.do_number,
+      file_number: numbers.file_number,
       created_by: userId,
       updated_by: userId,
       created_at: new Date(),
@@ -708,8 +736,6 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
     },
     { transaction }
   )
-
-  await assignShipmentNumbers(shipment, transaction)
   await seedShipmentCommercialBase(shipment, quotation, userId, transaction)
   await seedShipmentDimensionsFromQuotation(shipment, quotation, transaction)
 
@@ -763,6 +789,8 @@ async function listShipments(query) {
   const queryOptions = {
     where,
     attributes: SHIPMENT_LIST_ATTRIBUTES,
+    include: shipmentListIncludes(),
+    distinct: true,
     order: [['created_at', 'DESC']],
     limit,
     offset,
@@ -770,7 +798,6 @@ async function listShipments(query) {
 
   if (includeDetails) {
     queryOptions.include = shipmentDetailIncludes()
-    queryOptions.distinct = true
   }
 
   const { count, rows } = await Shipment.findAndCountAll(queryOptions)
@@ -779,7 +806,7 @@ async function listShipments(query) {
     total: count,
     page,
     limit,
-    data: rows,
+    data: rows.map(attachShipmentDerivedNumbers),
   }
 }
 
@@ -814,7 +841,7 @@ async function getShipmentById(id, query = {}) {
     deriveFinancialStatus(shipment.financial_status, customerInvoiced, vendorInvoiced)
   )
 
-  return shipment
+  return attachShipmentDerivedNumbers(shipment)
 }
 
 async function createShipment(data, userId) {
@@ -823,9 +850,13 @@ async function createShipment(data, userId) {
   const transaction = await sequelize.transaction()
 
   try {
+    const numbers = await generateShipmentNumbers(transaction)
+
     const shipment = await Shipment.create(
       {
         ...data,
+        do_number: numbers.do_number,
+        file_number: numbers.file_number,
         closure_status: deriveClosureStatusFromOperationalStatus(
           data.operational_status || 'CREADA'
         ),
@@ -836,8 +867,6 @@ async function createShipment(data, userId) {
       },
       { transaction }
     )
-
-    await assignShipmentNumbers(shipment, transaction)
 
     await createAuditLog({
       shipment_id: shipment.id,
