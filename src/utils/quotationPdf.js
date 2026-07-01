@@ -147,17 +147,8 @@ function resolveLineLabel(code) {
 
 function resolveLogoPath() {
   const candidates = [
-    'C:\\Users\\tech\\Pictures\\Fastway.png',
-    process.env.LOGO_GENIKA,
-    path.resolve(process.cwd(), 'src', 'utils', 'Genika.png'),
-    path.resolve(process.cwd(), 'utils', 'Genika.png'),
-    path.resolve(process.cwd(), 'public', 'Genika.png'),
-    path.resolve(
-      'C:\\Users\\tech\\Desktop\\Sistemas Genika\\wmsBack\\src\\utils\\Genika.png'
-    ),
-    path.resolve(
-      'C:\\Users\\tech\\Desktop\\Sistemas Genika\\wmsBack\\public\\Genika.png'
-    ),
+    path.resolve(__dirname, '..', '..', 'config', 'Fastway.png'),
+    path.resolve(process.cwd(), 'config', 'Fastway.png'),
   ].filter(Boolean)
 
   return candidates.find(currentPath => {
