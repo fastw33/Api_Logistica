@@ -2,6 +2,7 @@ const { sequelize } = require('../../config/db')
 const { Op } = require('sequelize')
 const { buildPagination } = require('../../utils/pagination')
 const { createAuditLog } = require('../../utils/audit')
+const { generateQuotationNumber } = require('../../utils/shipmentNumbers')
 const Quotation = require('./quotation.model')
 const QuotationService = require('../quotationServices/quotationService.model')
 const QuotationDocument = require('../quotationDocuments/quotationDocument.model')
@@ -20,6 +21,7 @@ const {
 
 const QUOTATION_LIST_ATTRIBUTES = [
   'id',
+  'quotation_number',
   'lead_external_id',
   'customer_id',
   'project_external_id',
@@ -39,6 +41,7 @@ const QUOTATION_LIST_ATTRIBUTES = [
 
 const QUOTATION_DETAIL_ATTRIBUTES = [
   'id',
+  'quotation_number',
   'lead_external_id',
   'customer_id',
   'project_external_id',
@@ -380,10 +383,12 @@ async function createQuotation(data, userId) {
 
   try {
     const sanitizedData = sanitizeQuotationPayload(data)
+    const quotationNumber = await generateQuotationNumber(transaction)
 
     const quotation = await Quotation.create(
       {
         ...sanitizedData,
+        quotation_number: quotationNumber,
         created_by: userId,
         updated_by: userId,
         created_at: new Date(),

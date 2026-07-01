@@ -32,6 +32,11 @@ const Quotation = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
+    quotation_number: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true,
+    },
     line_key: {
       type: DataTypes.STRING(20),
       allowNull: false,
