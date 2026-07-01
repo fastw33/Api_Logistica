@@ -201,6 +201,48 @@ function okFont(filePath) {
 }
 
 function resolveFontPaths() {
+  {
+    const regular = okFont(process.env.PDF_FONT_REGULAR)
+      ? process.env.PDF_FONT_REGULAR
+      : null
+    const bold = okFont(process.env.PDF_FONT_BOLD)
+      ? process.env.PDF_FONT_BOLD
+      : null
+    const italic = okFont(process.env.PDF_FONT_ITALIC)
+      ? process.env.PDF_FONT_ITALIC
+      : null
+    const bolditalic = okFont(process.env.PDF_FONT_BOLDITALIC)
+      ? process.env.PDF_FONT_BOLDITALIC
+      : null
+
+    if (regular && bold) {
+      return {
+        regular,
+        bold,
+        italic: italic || regular,
+        bolditalic: bolditalic || bold,
+      }
+    }
+  }
+
+  try {
+    const base = path.dirname(require.resolve('dejavu-fonts-ttf/package.json'))
+    const fontsDir = path.join(base, 'ttf')
+    const regular = path.join(fontsDir, 'DejaVuSans.ttf')
+    const bold = path.join(fontsDir, 'DejaVuSans-Bold.ttf')
+    const italic = path.join(fontsDir, 'DejaVuSans-Oblique.ttf')
+    const bolditalic = path.join(fontsDir, 'DejaVuSans-BoldOblique.ttf')
+
+    if (okFont(regular) && okFont(bold)) {
+      return {
+        regular,
+        bold,
+        italic: okFont(italic) ? italic : regular,
+        bolditalic: okFont(bolditalic) ? bolditalic : bold,
+      }
+    }
+  } catch {}
+
   try {
     const regular =
       require.resolve('@fontsource/roboto/files/roboto-latin-400-normal.ttf')
@@ -237,6 +279,37 @@ function resolveFontPaths() {
 
   if (okFont(windowsFallback.regular) && okFont(windowsFallback.bold)) {
     return windowsFallback
+  }
+
+  const linuxFallback = {
+    regular: '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    bold: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+    italic: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf',
+    bolditalic: '/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf',
+  }
+
+  if (okFont(linuxFallback.regular) && okFont(linuxFallback.bold)) {
+    return linuxFallback
+  }
+
+  const macFallback = {
+    regular: '/Library/Fonts/Arial.ttf',
+    bold: '/Library/Fonts/Arial Bold.ttf',
+    italic: '/Library/Fonts/Arial Italic.ttf',
+    bolditalic: '/Library/Fonts/Arial Bold Italic.ttf',
+  }
+
+  if (okFont(macFallback.regular) && okFont(macFallback.bold)) {
+    return {
+      regular: macFallback.regular,
+      bold: macFallback.bold,
+      italic: okFont(macFallback.italic)
+        ? macFallback.italic
+        : macFallback.regular,
+      bolditalic: okFont(macFallback.bolditalic)
+        ? macFallback.bolditalic
+        : macFallback.bold,
+    }
   }
 
   return null
