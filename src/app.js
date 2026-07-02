@@ -10,7 +10,7 @@ const notFound = require('./middlewares/notFound')
 require('dotenv').config()
 
 const app = express()
-const REQUEST_BODY_LIMIT = '50mb'
+const REQUEST_BODY_LIMIT = '100mb'
 
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
