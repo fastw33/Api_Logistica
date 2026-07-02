@@ -17,6 +17,10 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .map(origin => origin.trim())
   .filter(Boolean)
 
+const uploadFrameAncestors = allowedOrigins.length
+  ? `frame-ancestors 'self' ${allowedOrigins.join(' ')}`
+  : 'frame-ancestors *'
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
@@ -53,7 +57,20 @@ app.use((req, res, next) => {
   return authMiddleware(req, res, next)
 })
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Content-Security-Policy', uploadFrameAncestors)
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+  next()
+})
+
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'), {
+    maxAge: '1d',
+    etag: true,
+    lastModified: true,
+  })
+)
 
 const rutas = [
   ['quotations', './modules/quotations/quotation.routes'],
