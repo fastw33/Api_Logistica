@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const multer = require('multer')
 
-const MAX_UPLOAD_SIZE_MB = 50
+const MAX_UPLOAD_SIZE_MB = 100
 const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 function ensureDir(dirPath) {
