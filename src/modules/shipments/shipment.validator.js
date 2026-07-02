@@ -70,7 +70,6 @@ const commonShipmentRules = [
 ]
 
 exports.validateCreate = [
-  body('lead_external_id').exists().withMessage('lead_external_id es requerido').bail().isString(),
   body('customer_id').exists().withMessage('customer_id es requerido').bail().isString(),
   body('subject').exists().withMessage('subject es requerido').bail().isString(),
   body('transport_mode').exists().withMessage('transport_mode es requerido').bail().isIn(QUOTATION_TRANSPORT_MODES),
