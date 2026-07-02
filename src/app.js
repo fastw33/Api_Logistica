@@ -10,6 +10,7 @@ const notFound = require('./middlewares/notFound')
 require('dotenv').config()
 
 const app = express()
+const REQUEST_BODY_LIMIT = '50mb'
 
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
@@ -35,8 +36,8 @@ app.use(
   })
 )
 app.use(rateLimit)
-app.use(express.json({ limit: '10mb' }))
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json({ limit: REQUEST_BODY_LIMIT }))
+app.use(express.urlencoded({ extended: true, limit: REQUEST_BODY_LIMIT }))
 app.use(sanitizeRequest)
 
 app.get('/health', (req, res) => {
