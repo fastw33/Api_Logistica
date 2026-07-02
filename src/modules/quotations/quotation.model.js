@@ -18,7 +18,7 @@ const Quotation = sequelize.define(
     },
     lead_external_id: {
       type: DataTypes.STRING(100),
-      allowNull: false,
+      allowNull: true,
     },
     customer_id: {
       type: DataTypes.STRING(100),
