@@ -9,6 +9,20 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true })
 }
 
+function sanitizeFilename(originalname) {
+  const extension = String(path.extname(originalname) || '').toLowerCase()
+  const rawBaseName = path.basename(originalname, extension)
+  const sanitizedBaseName = rawBaseName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9 _().-]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-_.()]+|[-_.()]+$/g, '')
+
+  return `${sanitizedBaseName || 'archivo'}${extension}`
+}
+
 const storage = multer.diskStorage({
   destination(req, file, cb) {
     const folder = req.uploadFolder || 'general'
@@ -29,7 +43,7 @@ const storage = multer.diskStorage({
     cb(null, destination)
   },
   filename(req, file, cb) {
-    const safeName = file.originalname.replace(/\s+/g, '-')
+    const safeName = sanitizeFilename(file.originalname)
     cb(null, `${Date.now()}-${safeName}`)
   },
 })
