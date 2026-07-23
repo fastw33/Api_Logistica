@@ -3,6 +3,7 @@ const {
   QUOTATION_BUSINESS_TYPES,
   QUOTATION_MATERIAL_CLASSES,
   QUOTATION_MODALITIES,
+  QUOTATION_SERVICE_SCOPES,
   QUOTATION_TRANSPORT_MODES,
   SHIPMENT_CLOSURE_STATUSES,
   SHIPMENT_FINANCIAL_STATUSES,
@@ -67,6 +68,10 @@ const Shipment = sequelize.define(
     business_type: {
       type: DataTypes.ENUM(...QUOTATION_BUSINESS_TYPES),
       allowNull: false,
+    },
+    service_scope: {
+      type: DataTypes.ENUM(...QUOTATION_SERVICE_SCOPES),
+      allowNull: true,
     },
     material_class: {
       type: DataTypes.ENUM(...QUOTATION_MATERIAL_CLASSES),

@@ -4,6 +4,7 @@ const {
   QUOTATION_CLOSURE_STATUSES,
   QUOTATION_MATERIAL_CLASSES,
   QUOTATION_MODALITIES,
+  QUOTATION_SERVICE_SCOPES,
   QUOTATION_SERVICE_CODES,
   QUOTATION_STATUSES,
   QUOTATION_TRANSPORT_MODES,
@@ -46,6 +47,10 @@ const commonQuotationRules = [
     .optional()
     .isIn(QUOTATION_BUSINESS_TYPES)
     .withMessage(`business_type debe ser uno de: ${QUOTATION_BUSINESS_TYPES.join(', ')}`),
+  body('service_scope')
+    .optional()
+    .isIn(QUOTATION_SERVICE_SCOPES)
+    .withMessage(`service_scope debe ser uno de: ${QUOTATION_SERVICE_SCOPES.join(', ')}`),
   body('material_class')
     .optional()
     .isIn(QUOTATION_MATERIAL_CLASSES)
@@ -163,6 +168,10 @@ exports.validateCreate = [
     .bail()
     .isIn(QUOTATION_BUSINESS_TYPES)
     .withMessage(`business_type debe ser uno de: ${QUOTATION_BUSINESS_TYPES.join(', ')}`),
+  body('service_scope')
+    .optional()
+    .isIn(QUOTATION_SERVICE_SCOPES)
+    .withMessage(`service_scope debe ser uno de: ${QUOTATION_SERVICE_SCOPES.join(', ')}`),
   body('origin_country').exists().withMessage('origin_country es requerido').bail().isString(),
   body('destination_country').exists().withMessage('destination_country es requerido').bail().isString(),
   ...commonQuotationRules,

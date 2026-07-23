@@ -37,6 +37,10 @@ const SHIPMENT_LIST_ATTRIBUTES = [
   'line_key',
   'do_number',
   'subject',
+  'transport_mode',
+  'modality',
+  'business_type',
+  'service_scope',
   'operational_status',
   'financial_status',
   'customer_invoiced',
@@ -58,6 +62,7 @@ const SHIPMENT_DETAIL_ATTRIBUTES = [
   'transport_mode',
   'modality',
   'business_type',
+  'service_scope',
   'material_class',
   'operational_status',
   'financial_status',
@@ -272,6 +277,39 @@ function deriveClosureStatusFromOperationalStatus(operationalStatus) {
   )
     ? 'CERRADO'
     : 'ABIERTO'
+}
+
+function normalizeServiceScope(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+
+  return [
+    'IMPORTACION',
+    'EXPORTACION',
+    'ALMACENAMIENTO',
+    'TERRESTRE',
+    'LOGISTICA_CIRCULAR',
+    'ASESORIA',
+  ].includes(normalized)
+    ? normalized
+    : null
+}
+
+function sanitizeShipmentPayload(data = {}) {
+  const shouldNormalizeServiceScope = Object.prototype.hasOwnProperty.call(
+    data,
+    'service_scope'
+  )
+
+  return {
+    ...data,
+    ...(shouldNormalizeServiceScope
+      ? {
+          service_scope: normalizeServiceScope(data.service_scope),
+        }
+      : {}),
+  }
 }
 
 function mapServiceCodeToCostType(serviceCode) {
@@ -695,7 +733,22 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
     transaction,
   })
 
-  if (existing) return existing
+  const quotationServiceScope = normalizeServiceScope(quotation.service_scope)
+
+  if (existing) {
+    if (normalizeServiceScope(existing.service_scope) !== quotationServiceScope) {
+      await existing.update(
+        {
+          service_scope: quotationServiceScope,
+          updated_by: userId,
+          updated_at: new Date(),
+        },
+        { transaction }
+      )
+    }
+
+    return existing
+  }
 
   const numbers = await generateShipmentNumbers(transaction)
 
@@ -711,6 +764,7 @@ async function createShipmentFromQuotation(quotation, userId, transaction) {
       transport_mode: quotation.transport_mode,
       modality: quotation.modality,
       business_type: quotation.business_type,
+      service_scope: quotationServiceScope,
       material_class: quotation.material_class,
       incoterm: quotation.incoterm,
       origin_country: quotation.origin_country,
@@ -780,6 +834,7 @@ async function listShipments(query) {
   }
   if (query.financial_status) where.financial_status = query.financial_status
   if (query.customer_id) where.customer_id = query.customer_id
+  if (query.service_scope) where.service_scope = query.service_scope
   if (query.quotation_id) where.quotation_id = query.quotation_id
   if (query.lead_external_id) where.lead_external_id = query.lead_external_id
   if (query.project_external_id) where.project_external_id = query.project_external_id
@@ -846,6 +901,7 @@ async function getShipmentById(id, query = {}) {
 
 async function createShipment(data, userId) {
   await assertClientHasRequiredDocuments(data.customer_id)
+  const sanitizedData = sanitizeShipmentPayload(data)
 
   const transaction = await sequelize.transaction()
 
@@ -854,11 +910,11 @@ async function createShipment(data, userId) {
 
     const shipment = await Shipment.create(
       {
-        ...data,
+        ...sanitizedData,
         do_number: numbers.do_number,
         file_number: numbers.file_number,
         closure_status: deriveClosureStatusFromOperationalStatus(
-          data.operational_status || 'CREADA'
+          sanitizedData.operational_status || 'CREADA'
         ),
         created_by: userId,
         updated_by: userId,
@@ -887,6 +943,7 @@ async function createShipment(data, userId) {
 }
 
 async function updateShipment(id, data, userId) {
+  const sanitizedData = sanitizeShipmentPayload(data)
   const transaction = await sequelize.transaction()
 
   try {
@@ -900,7 +957,7 @@ async function updateShipment(id, data, userId) {
     const before = shipment.toJSON()
 
     if (
-      data.financial_status === 'CERRADA' &&
+      sanitizedData.financial_status === 'CERRADA' &&
       shipment.operational_status !== 'FINALIZADA_OPERATIVAMENTE'
     ) {
       const error = new Error(
@@ -912,9 +969,9 @@ async function updateShipment(id, data, userId) {
 
     await shipment.update(
       {
-        ...data,
+        ...sanitizedData,
         closure_status: deriveClosureStatusFromOperationalStatus(
-          data.operational_status || shipment.operational_status
+          sanitizedData.operational_status || shipment.operational_status
         ),
         updated_by: userId,
         updated_at: new Date(),
@@ -923,8 +980,8 @@ async function updateShipment(id, data, userId) {
     )
 
     if (
-      data.operational_status &&
-      data.operational_status !== before.operational_status
+      sanitizedData.operational_status &&
+      sanitizedData.operational_status !== before.operational_status
     ) {
       await createAuditLog({
         shipment_id: shipment.id,
@@ -932,20 +989,23 @@ async function updateShipment(id, data, userId) {
         entity_id: shipment.id,
         action: 'CAMBIO_ESTADO_OPERACIONAL',
         old_values: { operational_status: before.operational_status },
-        new_values: { operational_status: data.operational_status },
+        new_values: { operational_status: sanitizedData.operational_status },
         user_id: userId,
         transaction,
       })
     }
 
-    if (data.financial_status && data.financial_status !== before.financial_status) {
+    if (
+      sanitizedData.financial_status &&
+      sanitizedData.financial_status !== before.financial_status
+    ) {
       await createAuditLog({
         shipment_id: shipment.id,
         entity_type: 'shipment',
         entity_id: shipment.id,
         action: 'CAMBIO_ESTADO_FINANCIERO',
         old_values: { financial_status: before.financial_status },
-        new_values: { financial_status: data.financial_status },
+        new_values: { financial_status: sanitizedData.financial_status },
         user_id: userId,
         transaction,
       })

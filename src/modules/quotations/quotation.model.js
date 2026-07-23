@@ -4,6 +4,7 @@ const {
   QUOTATION_CLOSURE_STATUSES,
   QUOTATION_MATERIAL_CLASSES,
   QUOTATION_MODALITIES,
+  QUOTATION_SERVICE_SCOPES,
   QUOTATION_STATUSES,
   QUOTATION_TRANSPORT_MODES,
 } = require('../../utils/logisticsEnums')
@@ -57,6 +58,10 @@ const Quotation = sequelize.define(
     business_type: {
       type: DataTypes.ENUM(...QUOTATION_BUSINESS_TYPES),
       allowNull: false,
+    },
+    service_scope: {
+      type: DataTypes.ENUM(...QUOTATION_SERVICE_SCOPES),
+      allowNull: true,
     },
     material_class: {
       type: DataTypes.ENUM(...QUOTATION_MATERIAL_CLASSES),

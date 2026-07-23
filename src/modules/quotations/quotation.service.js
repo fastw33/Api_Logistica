@@ -31,6 +31,7 @@ const QUOTATION_LIST_ATTRIBUTES = [
   'transport_mode',
   'modality',
   'business_type',
+  'service_scope',
   'material_class',
   'status',
   'closure_status',
@@ -51,6 +52,7 @@ const QUOTATION_DETAIL_ATTRIBUTES = [
   'transport_mode',
   'modality',
   'business_type',
+  'service_scope',
   'material_class',
   'declared_value',
   'cif_value',
@@ -212,12 +214,38 @@ function normalizeLineKey(value) {
     : undefined
 }
 
+function normalizeServiceScope(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+
+  return [
+    'IMPORTACION',
+    'EXPORTACION',
+    'ALMACENAMIENTO',
+    'TERRESTRE',
+    'LOGISTICA_CIRCULAR',
+    'ASESORIA',
+  ].includes(normalized)
+    ? normalized
+    : null
+}
+
 function sanitizeQuotationPayload(data = {}) {
   const normalizedLineKey = normalizeLineKey(data.line_key)
+  const shouldNormalizeServiceScope = Object.prototype.hasOwnProperty.call(
+    data,
+    'service_scope'
+  )
 
   return {
     ...data,
     ...(normalizedLineKey ? { line_key: normalizedLineKey } : {}),
+    ...(shouldNormalizeServiceScope
+      ? {
+          service_scope: normalizeServiceScope(data.service_scope),
+        }
+      : {}),
     declared_value: normalizeNullableDecimal(data.declared_value),
     cif_value: normalizeNullableDecimal(data.cif_value),
     trm: normalizeNullableDecimal(data.trm),
@@ -341,6 +369,7 @@ async function listQuotations(query) {
   if (query.status) where.status = query.status
   if (query.customer_id) where.customer_id = query.customer_id
   if (query.transport_mode) where.transport_mode = query.transport_mode
+  if (query.service_scope) where.service_scope = query.service_scope
   if (query.lead_external_id) where.lead_external_id = query.lead_external_id
   if (query.project_external_id) where.project_external_id = query.project_external_id
   if (query.closure_status) {
