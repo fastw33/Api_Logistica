@@ -3,6 +3,7 @@ const {
   QUOTATION_BUSINESS_TYPES,
   QUOTATION_MATERIAL_CLASSES,
   QUOTATION_MODALITIES,
+  QUOTATION_SERVICE_SCOPES,
   QUOTATION_TRANSPORT_MODES,
   SHIPMENT_CLOSURE_STATUSES,
   SHIPMENT_FINANCIAL_STATUSES,
@@ -29,6 +30,10 @@ const commonShipmentRules = [
   body('transport_mode').optional().isIn(QUOTATION_TRANSPORT_MODES).withMessage('transport_mode inválido'),
   body('modality').optional().isIn(QUOTATION_MODALITIES).withMessage('modality inválido'),
   body('business_type').optional().isIn(QUOTATION_BUSINESS_TYPES).withMessage('business_type inválido'),
+  body('service_scope')
+    .optional()
+    .isIn(QUOTATION_SERVICE_SCOPES)
+    .withMessage(`service_scope debe ser uno de: ${QUOTATION_SERVICE_SCOPES.join(', ')}`),
   body('material_class').optional().isIn(QUOTATION_MATERIAL_CLASSES).withMessage('material_class inválido'),
   body('operational_status')
     .optional()
@@ -75,6 +80,7 @@ exports.validateCreate = [
   body('transport_mode').exists().withMessage('transport_mode es requerido').bail().isIn(QUOTATION_TRANSPORT_MODES),
   body('modality').exists().withMessage('modality es requerido').bail().isIn(QUOTATION_MODALITIES),
   body('business_type').exists().withMessage('business_type es requerido').bail().isIn(QUOTATION_BUSINESS_TYPES),
+  body('service_scope').optional().isIn(QUOTATION_SERVICE_SCOPES),
   body('origin_country').exists().withMessage('origin_country es requerido').bail().isString(),
   body('destination_country').exists().withMessage('destination_country es requerido').bail().isString(),
   ...commonShipmentRules,
