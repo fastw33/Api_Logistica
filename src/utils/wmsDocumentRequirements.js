@@ -89,6 +89,42 @@ async function fetchWmsDocuments(resourcePath, notFoundMessage) {
   return payload
 }
 
+async function fetchWmsEntity(resourcePath, notFoundMessage, fallbackMessage) {
+  const baseUrl = resolveWmsBaseUrl()
+
+  let response
+  try {
+    response = await fetch(`${baseUrl}${resourcePath}`, {
+      headers: buildWmsHeaders(),
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (error) {
+    const upstreamError = new Error(
+      fallbackMessage ||
+        'No fue posible consultar la informacion en WMS para completar la operacion'
+    )
+    upstreamError.status = 503
+    upstreamError.cause = error
+    throw upstreamError
+  }
+
+  let payload = null
+  try {
+    payload = await response.json()
+  } catch (error) {
+    payload = null
+  }
+
+  if (!response.ok) {
+    const error = new Error(payload?.message || notFoundMessage)
+    error.status = response.status === 404 ? 404 : 400
+    error.details = payload
+    throw error
+  }
+
+  return payload
+}
+
 function findMissingDocuments(archivos = [], requiredFields = []) {
   const availableFields = new Set(
     (Array.isArray(archivos) ? archivos : [])
@@ -180,8 +216,28 @@ async function assertQuotationThirdPartiesReady(quotation) {
   )
 }
 
+async function fetchClientDisplayName(clientId) {
+  if (!clientId) return ''
+
+  const payload = await fetchWmsEntity(
+    `/cliente/${encodeURIComponent(clientId)}`,
+    'No fue posible obtener la informacion del cliente',
+    'No fue posible consultar el cliente en WMS'
+  )
+
+  return String(
+    payload?.Nombre ||
+      payload?.nombre ||
+      payload?.client_name ||
+      payload?.razon_social ||
+      payload?.Razon_social ||
+      ''
+  ).trim()
+}
+
 module.exports = {
   assertClientHasRequiredDocuments,
   assertProviderHasRequiredDocuments,
   assertQuotationThirdPartiesReady,
+  fetchClientDisplayName,
 }

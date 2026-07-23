@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { PDFDocument } = require('pdf-lib')
 const PdfPrinter = require('pdfmake')
+const { fetchClientDisplayName } = require('./wmsDocumentRequirements')
 
 const COLORS = {
   orange: '#F26A21',
@@ -64,6 +65,15 @@ const BUSINESS_LABELS = {
   EXPORTACIONES: 'Exportaciones',
   LOGISTICA_ALMACENAMIENTO: 'Logistica Almacenamiento',
   TRANSPORTE: 'Transporte',
+}
+
+const SERVICE_SCOPE_LABELS = {
+  IMPORTACION: 'Importacion',
+  EXPORTACION: 'Exportacion',
+  ALMACENAMIENTO: 'Almacenamiento',
+  TERRESTRE: 'Terrestre',
+  LOGISTICA_CIRCULAR: 'Logistica Circular',
+  ASESORIA: 'Asesoria',
 }
 
 const LINE_LABELS = {
@@ -135,6 +145,16 @@ function resolveBusinessLabel(code) {
   )
 }
 
+function resolveServiceScopeLabel(code) {
+  return (
+    SERVICE_SCOPE_LABELS[
+      String(code || '')
+        .trim()
+        .toUpperCase()
+    ] || safeText(code)
+  )
+}
+
 function resolveLineLabel(code) {
   return (
     LINE_LABELS[
@@ -172,6 +192,32 @@ function resolveCommercialDisplay(quotation) {
   }
 
   return ''
+}
+
+async function resolveQuotationPdfData(quotation) {
+  if (!quotation) return quotation
+
+  const explicitCustomerName = String(quotation.customer_name || '').trim()
+  if (explicitCustomerName) {
+    return {
+      ...quotation,
+      customer_name: explicitCustomerName,
+    }
+  }
+
+  try {
+    const resolvedCustomerName = await fetchClientDisplayName(quotation.customer_id)
+    if (resolvedCustomerName) {
+      return {
+        ...quotation,
+        customer_name: resolvedCustomerName,
+      }
+    }
+  } catch (error) {
+    // If WMS is unavailable, keep generating the PDF with the identifier.
+  }
+
+  return quotation
 }
 
 function isTtfOrOtf(filePath) {
@@ -461,6 +507,10 @@ function buildPdfDefinition(quotation) {
     {
       label: 'Tipo de negocio',
       value: resolveBusinessLabel(quotation?.business_type),
+    },
+    {
+      label: 'Tipo de servicio',
+      value: resolveServiceScopeLabel(quotation?.service_scope),
     },
     { label: 'Modo transporte', value: quotation?.transport_mode },
     { label: 'Modalidad', value: quotation?.modality },
@@ -770,7 +820,8 @@ async function buildPdfBuffer(docDefinition) {
 }
 
 async function createQuotationPdfBuffer(quotation) {
-  return buildPdfBuffer(buildPdfDefinition(quotation))
+  const pdfQuotation = await resolveQuotationPdfData(quotation)
+  return buildPdfBuffer(buildPdfDefinition(pdfQuotation))
 }
 
 function buildQuotationPdfFilename(quotation) {
