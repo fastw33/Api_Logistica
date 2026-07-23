@@ -15,6 +15,12 @@ function buildUploadedFileUrl(folder, entityPrefix, entityId, file) {
   return `/uploads/${folder}/${entityPrefix}-${entityId}/${file.filename}`
 }
 
+function getUploadedDocumentFiles(req) {
+  if (Array.isArray(req.files)) return req.files
+  if (req.file) return [req.file]
+  return []
+}
+
 exports.getAllQuotations = async (req, res, next) => {
   try {
     const result = await quotationService.listQuotations(req.query)
@@ -135,32 +141,45 @@ exports.convertToShipment = async (req, res, next) => {
 exports.createDocument = async (req, res, next) => {
   try {
     const quotationId = Number(req.params.id)
-    const fileUrl = req.file
-      ? buildUploadedFileUrl('quotation-documents', 'quotation', quotationId, req.file)
-      : req.body.file_url
+    const uploadedFiles = getUploadedDocumentFiles(req)
 
-    if (!fileUrl) {
+    if (!uploadedFiles.length && !req.body.file_url) {
       return res.status(400).json({
         message: 'Debes adjuntar un archivo o enviar file_url',
       })
     }
 
-    const document = await createQuotationDocument(
-      quotationId,
-      {
-        document_type: req.body.document_type,
-        document_name: req.body.document_name || req.file?.originalname || 'Documento CT',
-        package_name: req.body.package_name || null,
-        file_url: fileUrl,
-        file_size: req.file?.size || null,
-        mime_type: req.file?.mimetype || null,
-      },
-      req.usuario?.id_usuario || null
-    )
+    const filesToPersist = uploadedFiles.length
+      ? uploadedFiles
+      : [{ originalname: req.body.document_name || 'Documento CT', file_url: req.body.file_url }]
+
+    const documents = []
+    for (const file of filesToPersist) {
+      const fileUrl =
+        file.file_url ||
+        buildUploadedFileUrl('quotation-documents', 'quotation', quotationId, file)
+      documents.push(
+        await createQuotationDocument(
+          quotationId,
+          {
+            document_type: req.body.document_type,
+            document_name: req.body.document_name || file.originalname || 'Documento CT',
+            package_name: req.body.package_name || null,
+            file_url: fileUrl,
+            file_size: file.size || null,
+            mime_type: file.mimetype || null,
+          },
+          req.usuario?.id_usuario || null
+        )
+      )
+    }
 
     res.status(201).json({
-      message: 'Documento de CT cargado correctamente',
-      data: document,
+      message:
+        documents.length > 1
+          ? 'Paquete de documentos CT cargado correctamente'
+          : 'Documento de CT cargado correctamente',
+      data: documents.length > 1 ? documents : documents[0],
     })
   } catch (error) {
     next(error)

@@ -73,6 +73,5 @@ module.exports = multer({
   fileFilter,
   limits: {
     fileSize: MAX_UPLOAD_SIZE_BYTES,
-    files: 4,
   },
 })

@@ -28,6 +28,12 @@ function getSupportUploadFile(req) {
   )
 }
 
+function getUploadedDocumentFiles(req) {
+  if (Array.isArray(req.files)) return req.files
+  if (req.file) return [req.file]
+  return []
+}
+
 function buildInvoicePayload(req, shipmentId, folderName) {
   const invoiceFile = getUploadedFile(req, 'invoice_file')
 
@@ -121,33 +127,44 @@ exports.updateShipment = async (req, res, next) => {
 exports.createDocument = async (req, res, next) => {
   try {
     const shipmentId = Number(req.params.id)
-    const fileUrl = req.file
-      ? buildUploadedFileUrl('documents', shipmentId, req.file)
-      : req.body.file_url
+    const uploadedFiles = getUploadedDocumentFiles(req)
 
-    if (!fileUrl) {
+    if (!uploadedFiles.length && !req.body.file_url) {
       return res.status(400).json({
         message: 'Debes adjuntar un archivo o enviar file_url',
       })
     }
 
-    const document = await createShipmentDocument(
-      shipmentId,
-      {
-        quotation_id: req.body.quotation_id || null,
-        document_type: req.body.document_type,
-        document_name: req.body.document_name || req.file?.originalname || 'Documento',
-        package_name: req.body.package_name || null,
-        file_url: fileUrl,
-        file_size: req.file?.size || null,
-        mime_type: req.file?.mimetype || null,
-      },
-      req.usuario?.id_usuario || null
-    )
+    const filesToPersist = uploadedFiles.length
+      ? uploadedFiles
+      : [{ originalname: req.body.document_name || 'Documento', file_url: req.body.file_url }]
+
+    const documents = []
+    for (const file of filesToPersist) {
+      const fileUrl = file.file_url || buildUploadedFileUrl('documents', shipmentId, file)
+      documents.push(
+        await createShipmentDocument(
+          shipmentId,
+          {
+            quotation_id: req.body.quotation_id || null,
+            document_type: req.body.document_type,
+            document_name: req.body.document_name || file.originalname || 'Documento',
+            package_name: req.body.package_name || null,
+            file_url: fileUrl,
+            file_size: file.size || null,
+            mime_type: file.mimetype || null,
+          },
+          req.usuario?.id_usuario || null
+        )
+      )
+    }
 
     res.status(201).json({
-      message: 'Documento cargado correctamente',
-      data: document,
+      message:
+        documents.length > 1
+          ? 'Paquete de documentos cargado correctamente'
+          : 'Documento cargado correctamente',
+      data: documents.length > 1 ? documents : documents[0],
     })
   } catch (error) {
     next(error)

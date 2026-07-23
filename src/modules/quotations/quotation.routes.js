@@ -39,7 +39,7 @@ router.post(
     req.uploadEntity = 'quotation'
     next()
   },
-  upload.single('file'),
+  upload.any(),
   documentValidator.validateCreate,
   validate,
   controller.createDocument
