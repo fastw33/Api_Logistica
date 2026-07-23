@@ -28,7 +28,7 @@ router.post(
     req.uploadEntity = 'shipment'
     next()
   },
-  upload.single('file'),
+  upload.any(),
   documentValidator.validateCreate,
   validate,
   controller.createDocument
