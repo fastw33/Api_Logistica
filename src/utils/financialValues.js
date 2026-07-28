@@ -44,13 +44,11 @@ function buildFlatInvoicePayload(data = {}, options = {}) {
     subtotal: total,
     taxes: 0,
     total,
-    paid_amount: paidAmount != null ? paidAmount : null,
+    paid_amount: paidAmount != null ? paidAmount : 0,
     balance:
       balance != null
         ? balance
-        : paidAmount != null
-          ? Math.max(total - paidAmount, 0)
-          : null,
+        : Math.max(total - (paidAmount != null ? paidAmount : 0), 0),
   }
 }
 
