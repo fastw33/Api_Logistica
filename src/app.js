@@ -12,6 +12,19 @@ require('dotenv').config()
 const app = express()
 const REQUEST_BODY_LIMIT = '100mb'
 
+function parseTrustProxy(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+
+  if (!normalized) return 1
+  if (normalized === 'true') return true
+  if (normalized === 'false') return false
+
+  const numericValue = Number(normalized)
+  return Number.isFinite(numericValue) ? numericValue : value
+}
+
+app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY_HOPS))
+
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
