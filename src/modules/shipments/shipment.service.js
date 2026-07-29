@@ -32,6 +32,7 @@ const {
 const SHIPMENT_LIST_ATTRIBUTES = [
   'id',
   'quotation_id',
+  'lead_external_id',
   'customer_id',
   'project_name',
   'line_key',
@@ -43,9 +44,20 @@ const SHIPMENT_LIST_ATTRIBUTES = [
   'service_scope',
   'operational_status',
   'financial_status',
+  'closure_status',
+  'origin_country',
+  'origin_city',
+  'origin_port',
+  'destination_country',
+  'destination_city',
+  'destination_port',
   'customer_invoiced',
   'vendor_invoiced',
+  'etd',
+  'eta',
+  'transit_days',
   'created_at',
+  'updated_at',
 ]
 
 const SHIPMENT_DETAIL_ATTRIBUTES = [
