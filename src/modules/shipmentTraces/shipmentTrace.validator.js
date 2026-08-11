@@ -17,10 +17,6 @@ exports.validateCreate = [
     .bail()
     .isString()
     .withMessage('note debe ser string'),
-  body('liquidation_link')
-    .optional({ nullable: true })
-    .isString()
-    .withMessage('liquidation_link debe ser string'),
   body('event_at')
     .optional({ nullable: true })
     .isISO8601()

@@ -36,7 +36,6 @@ async function createQuotationTrace(quotationId, data, userId) {
         trace_type: data.trace_type || 'NOTA',
         title: data.title || null,
         note: data.note,
-        liquidation_link: data.liquidation_link || null,
         event_at: data.event_at || new Date(),
         created_by: userId,
         created_at: new Date(),
