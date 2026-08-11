@@ -26,6 +26,10 @@ const ShipmentTrace = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    liquidation_link: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
     event_at: {
       type: DataTypes.DATE,
       allowNull: false,
