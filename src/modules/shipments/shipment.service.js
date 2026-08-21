@@ -267,6 +267,32 @@ const QUOTATION_SALE_ATTRIBUTES = [
   'total',
   'notes',
 ]
+const QUOTATION_DIMENSION_ATTRIBUTES = [
+  'id',
+  'quantity',
+  'package_type',
+  'gross_weight',
+  'volumetric_weight',
+  'volume_cbm',
+  'length',
+  'width',
+  'height',
+  'dimension_unit',
+  'notes',
+]
+
+const DIMENSION_COMPARE_FIELDS = [
+  'quantity',
+  'package_type',
+  'gross_weight',
+  'volumetric_weight',
+  'volume_cbm',
+  'length',
+  'width',
+  'height',
+  'dimension_unit',
+  'notes',
+]
 
 function hasInvoiceAttachment(invoice) {
   return Boolean(invoice?.support_file_url || invoice?.pdf_url || invoice?.xml_url)
@@ -289,6 +315,93 @@ function deriveClosureStatusFromOperationalStatus(operationalStatus) {
   )
     ? 'CERRADO'
     : 'ABIERTO'
+}
+
+function normalizeDimensionDecimal(value) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return ''
+  }
+
+  const amount = Number(String(value).replace(',', '.'))
+  return Number.isFinite(amount) ? amount.toFixed(3) : String(value).trim()
+}
+
+function normalizeDimensionText(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function buildDimensionComparisonRecord(item = {}) {
+  return DIMENSION_COMPARE_FIELDS.reduce((record, field) => {
+    if (
+      [
+        'quantity',
+        'gross_weight',
+        'volumetric_weight',
+        'volume_cbm',
+        'length',
+        'width',
+        'height',
+      ].includes(field)
+    ) {
+      record[field] = normalizeDimensionDecimal(item[field])
+      return record
+    }
+
+    if (field === 'dimension_unit') {
+      record[field] =
+        String(item[field] || '').trim().toLowerCase() === 'm' ? 'm' : 'cm'
+      return record
+    }
+
+    record[field] = normalizeDimensionText(item[field])
+    return record
+  }, {})
+}
+
+function buildDimensionSignature(dimensions = []) {
+  return (Array.isArray(dimensions) ? dimensions : [])
+    .map(buildDimensionComparisonRecord)
+    .filter(record =>
+      Object.entries(record).some(([field, value]) => {
+        if (field === 'dimension_unit') return false
+        return value !== ''
+      })
+    )
+    .map(record => JSON.stringify(record))
+    .sort()
+}
+
+function dimensionsMatch(sourceDimensions = [], targetDimensions = []) {
+  const sourceSignature = buildDimensionSignature(sourceDimensions)
+  const targetSignature = buildDimensionSignature(targetDimensions)
+
+  if (sourceSignature.length !== targetSignature.length) return false
+  return sourceSignature.every((value, index) => value === targetSignature[index])
+}
+
+function attachShipmentDimensionComparison(shipment) {
+  if (!shipment) return shipment
+
+  const shipmentDimensions = Array.isArray(shipment.dimensions)
+    ? shipment.dimensions
+    : []
+  const quotationDimensions = Array.isArray(shipment.quotation?.dimensions)
+    ? shipment.quotation.dimensions
+    : []
+  const hasReferenceDimensions = quotationDimensions.length > 0
+  const matchesQuotation =
+    !hasReferenceDimensions ||
+    dimensionsMatch(shipmentDimensions, quotationDimensions)
+
+  shipment.setDataValue('dimensions_match_quotation', matchesQuotation)
+  shipment.setDataValue(
+    'dimensions_mismatch_message',
+    matchesQuotation
+      ? null
+      : 'Las dimensiones del DO fueron ajustadas en operación y difieren de las registradas en la CT. Este cambio no modifica la cotización original.'
+  )
+
+  return shipment
 }
 
 function normalizeServiceScope(value) {
@@ -322,6 +435,31 @@ function sanitizeShipmentPayload(data = {}) {
         }
       : {}),
   }
+}
+
+function sanitizeShipmentDimensionItems(dimensions = []) {
+  return (Array.isArray(dimensions) ? dimensions : [])
+    .map(item => ({
+      quantity: item?.quantity,
+      package_type: item?.package_type || null,
+      gross_weight: item?.gross_weight || null,
+      volumetric_weight: item?.volumetric_weight || null,
+      volume_cbm: item?.volume_cbm || null,
+      length: item?.length || null,
+      width: item?.width || null,
+      height: item?.height || null,
+      dimension_unit:
+        String(item?.dimension_unit || '').trim().toLowerCase() === 'm'
+          ? 'm'
+          : 'cm',
+      notes: item?.notes || null,
+    }))
+    .filter(
+      item =>
+        item.quantity !== undefined &&
+        item.quantity !== null &&
+        String(item.quantity).trim() !== ''
+    )
 }
 
 function mapServiceCodeToCostType(serviceCode) {
@@ -506,28 +644,7 @@ async function seedShipmentDimensionsFromQuotation(
         transaction,
       })
 
-  const sanitizedDimensions = quotationDimensions
-    .map(item => ({
-      quantity: item?.quantity,
-      package_type: item?.package_type || null,
-      gross_weight: item?.gross_weight || null,
-      volumetric_weight: item?.volumetric_weight || null,
-      volume_cbm: item?.volume_cbm || null,
-      length: item?.length || null,
-      width: item?.width || null,
-      height: item?.height || null,
-      dimension_unit:
-        String(item?.dimension_unit || '').trim().toLowerCase() === 'm'
-          ? 'm'
-          : 'cm',
-      notes: item?.notes || null,
-    }))
-    .filter(
-      item =>
-        item.quantity !== undefined &&
-        item.quantity !== null &&
-        String(item.quantity).trim() !== ''
-    )
+  const sanitizedDimensions = sanitizeShipmentDimensionItems(quotationDimensions)
 
   if (!sanitizedDimensions.length) return
 
@@ -576,6 +693,12 @@ function shipmentDetailIncludes() {
           model: QuotationSale,
           as: 'sales',
           attributes: QUOTATION_SALE_ATTRIBUTES,
+          separate: true,
+        },
+        {
+          model: QuotationDimension,
+          as: 'dimensions',
+          attributes: QUOTATION_DIMENSION_ATTRIBUTES,
           separate: true,
         },
       ],
@@ -908,7 +1031,69 @@ async function getShipmentById(id, query = {}) {
     deriveFinancialStatus(shipment.financial_status, customerInvoiced, vendorInvoiced)
   )
 
+  attachShipmentDimensionComparison(shipment)
+
   return attachShipmentDerivedNumbers(shipment)
+}
+
+async function syncShipmentDimensions(shipmentId, dimensions, userId) {
+  const transaction = await sequelize.transaction()
+
+  try {
+    const shipment = await Shipment.findByPk(shipmentId, { transaction })
+    if (!shipment) {
+      const error = new Error('Shipment no encontrado')
+      error.status = 404
+      throw error
+    }
+
+    const before = await ShipmentDimension.findAll({
+      where: { shipment_id: shipmentId },
+      attributes: SHIPMENT_DIMENSION_ATTRIBUTES,
+      transaction,
+    })
+    const sanitizedDimensions = sanitizeShipmentDimensionItems(dimensions)
+
+    await ShipmentDimension.destroy({
+      where: { shipment_id: shipmentId },
+      transaction,
+    })
+
+    if (sanitizedDimensions.length) {
+      await ShipmentDimension.bulkCreate(
+        sanitizedDimensions.map(item => ({
+          shipment_id: shipmentId,
+          ...item,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })),
+        { transaction }
+      )
+    }
+
+    const after = await ShipmentDimension.findAll({
+      where: { shipment_id: shipmentId },
+      attributes: SHIPMENT_DIMENSION_ATTRIBUTES,
+      transaction,
+    })
+
+    await createAuditLog({
+      shipment_id: shipmentId,
+      entity_type: 'shipment_dimension',
+      entity_id: shipmentId,
+      action: 'ACTUALIZACION_DIMENSIONES_DO',
+      old_values: before.map(item => item.toJSON()),
+      new_values: after.map(item => item.toJSON()),
+      user_id: userId,
+      transaction,
+    })
+
+    await transaction.commit()
+    return getShipmentById(shipmentId)
+  } catch (error) {
+    await transaction.rollback()
+    throw error
+  }
 }
 
 async function createShipment(data, userId) {
@@ -1234,6 +1419,7 @@ module.exports = {
   getShipmentById,
   createShipment,
   updateShipment,
+  syncShipmentDimensions,
   convertQuotationToShipment,
   closeFinancialShipment,
   closeShipment,
