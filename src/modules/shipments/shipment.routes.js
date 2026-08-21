@@ -37,6 +37,7 @@ router.post(
 router.post('/:id/traces', traceValidator.validateCreate, validate, controller.createTrace)
 router.post('/:id/providers', providerValidator.validateCreate, validate, controller.createProvider)
 router.post('/:id/tasks', taskValidator.validateCreate, validate, controller.createTask)
+router.patch('/:id/dimensions', dimensionValidator.validateSync, validate, controller.syncDimensions)
 router.post('/:id/dimensions', dimensionValidator.validateCreate, validate, controller.createDimension)
 router.post('/:id/costs', costValidator.validateCreate, validate, controller.createCost)
 router.post('/:id/sales', saleValidator.validateCreate, validate, controller.createSale)

@@ -235,6 +235,22 @@ exports.createDimension = async (req, res, next) => {
   }
 }
 
+exports.syncDimensions = async (req, res, next) => {
+  try {
+    const shipment = await shipmentService.syncShipmentDimensions(
+      req.params.id,
+      req.body?.dimensions || [],
+      req.usuario?.id_usuario || null
+    )
+    res.json({
+      message: 'Dimensiones del DO actualizadas correctamente',
+      data: shipment,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 exports.createCost = async (req, res, next) => {
   try {
     const cost = await createShipmentCost(
