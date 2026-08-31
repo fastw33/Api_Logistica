@@ -512,6 +512,47 @@ function buildCreatedAtWhere(query = {}) {
   return Reflect.ownKeys(createdAt).length ? createdAt : null
 }
 
+function buildShipmentSearchWhere(query = {}) {
+  const search = String(query.search || query.q || '').trim()
+  if (!search) return null
+
+  const likeSearch = `%${search.slice(0, 80)}%`
+  const conditions = [
+    { do_number: { [Op.like]: likeSearch } },
+    { file_number: { [Op.like]: likeSearch } },
+    { subject: { [Op.like]: likeSearch } },
+    { customer_id: { [Op.like]: likeSearch } },
+    { project_external_id: { [Op.like]: likeSearch } },
+    { project_name: { [Op.like]: likeSearch } },
+    { lead_external_id: { [Op.like]: likeSearch } },
+    { transport_mode: { [Op.like]: likeSearch } },
+    { modality: { [Op.like]: likeSearch } },
+    { business_type: { [Op.like]: likeSearch } },
+    { service_scope: { [Op.like]: likeSearch } },
+    { operational_status: { [Op.like]: likeSearch } },
+    { financial_status: { [Op.like]: likeSearch } },
+    { closure_status: { [Op.like]: likeSearch } },
+  ]
+
+  const numericId = Number(search)
+  if (Number.isInteger(numericId) && numericId > 0) {
+    conditions.unshift({ id: numericId })
+  }
+
+  return { [Op.or]: conditions }
+}
+
+function buildLineKeyWhere(value) {
+  const lineKeys = String(value || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+
+  if (!lineKeys.length) return null
+  if (lineKeys.length === 1) return lineKeys[0]
+  return { [Op.in]: lineKeys }
+}
+
 function attachShipmentDerivedNumbers(shipment) {
   if (!shipment) return shipment
 
@@ -970,11 +1011,23 @@ async function listShipments(query) {
   if (query.financial_status) where.financial_status = query.financial_status
   if (query.customer_id) where.customer_id = query.customer_id
   if (query.service_scope) where.service_scope = query.service_scope
+  const lineKeyWhere = buildLineKeyWhere(query.line_key)
+  if (lineKeyWhere) where.line_key = lineKeyWhere
   if (query.quotation_id) where.quotation_id = query.quotation_id
   if (query.lead_external_id) where.lead_external_id = query.lead_external_id
   if (query.project_external_id) where.project_external_id = query.project_external_id
   const createdAtWhere = buildCreatedAtWhere(query)
   if (createdAtWhere) where.created_at = createdAtWhere
+  const searchWhere = buildShipmentSearchWhere(query)
+  if (searchWhere) where[Op.and] = [...(where[Op.and] || []), searchWhere]
+
+  const financialView = String(query.financial_view || '').trim().toLowerCase()
+  const financialTerminalStatuses = ['CIERRE_FINANCIERO', 'CERRADA']
+  if (!query.financial_status && financialView === 'active') {
+    where.financial_status = { [Op.notIn]: financialTerminalStatuses }
+  } else if (!query.financial_status && financialView === 'archived') {
+    where.financial_status = { [Op.in]: financialTerminalStatuses }
+  }
 
   const queryOptions = {
     where,
