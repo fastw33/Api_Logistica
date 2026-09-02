@@ -1,4 +1,5 @@
 const { sequelize } = require('../../config/db')
+const { Op } = require('sequelize')
 const { createAuditLog } = require('../../utils/audit')
 const { buildFlatInvoicePayload } = require('../../utils/financialValues')
 const Shipment = require('../shipments/shipment.model')
@@ -10,6 +11,47 @@ function resolveCostStatus(paymentStatus) {
   return String(paymentStatus || '').trim().toUpperCase() === 'PAGADA'
     ? 'PAGADO'
     : 'FACTURADO'
+}
+
+function buildDuplicateInvoiceNumberError(invoiceNumber) {
+  const error = new Error(
+    `Ya existe una factura proveedor con el numero ${invoiceNumber}.`
+  )
+  error.status = 409
+  error.code = 'DUPLICATE_INVOICE_NUMBER'
+  error.field = 'invoice_number'
+  error.value = invoiceNumber
+  return error
+}
+
+async function rollbackSafely(transaction) {
+  if (!transaction.finished) {
+    try {
+      await transaction.rollback()
+    } catch (rollbackError) {
+      console.error('No se pudo revertir la transaccion:', rollbackError)
+    }
+  }
+}
+
+async function assertInvoiceNumberAvailable(invoiceNumber, transaction, currentId) {
+  const normalizedInvoiceNumber = String(invoiceNumber || '').trim()
+  if (!normalizedInvoiceNumber) return
+
+  const where = { invoice_number: normalizedInvoiceNumber }
+  if (currentId) {
+    where.id = { [Op.ne]: currentId }
+  }
+
+  const existingInvoice = await VendorInvoice.findOne({
+    where,
+    attributes: ['id'],
+    transaction,
+  })
+
+  if (existingInvoice) {
+    throw buildDuplicateInvoiceNumberError(normalizedInvoiceNumber)
+  }
 }
 
 async function syncInvoiceCosts(invoiceId, costIds, paymentStatus, transaction) {
@@ -42,6 +84,8 @@ async function createVendorInvoice(shipmentId, data, userId) {
       error.status = 404
       throw error
     }
+
+    await assertInvoiceNumberAvailable(data.invoice_number, transaction)
 
     const normalizedAmounts = buildFlatInvoicePayload(data, {
       defaultCurrency: shipment.currency || 'COP',
@@ -90,7 +134,7 @@ async function createVendorInvoice(shipmentId, data, userId) {
     await transaction.commit()
     return invoice
   } catch (error) {
-    await transaction.rollback()
+    await rollbackSafely(transaction)
     throw error
   }
 }
@@ -108,6 +152,9 @@ async function updateVendorInvoice(id, data, userId) {
 
     const before = invoice.toJSON()
     const shipment = await Shipment.findByPk(invoice.shipment_id, { transaction })
+
+    await assertInvoiceNumberAvailable(data.invoice_number, transaction, id)
+
     const normalizedAmounts = buildFlatInvoicePayload(
       { ...invoice.toJSON(), ...data },
       {
@@ -148,7 +195,7 @@ async function updateVendorInvoice(id, data, userId) {
     await transaction.commit()
     return invoice
   } catch (error) {
-    await transaction.rollback()
+    await rollbackSafely(transaction)
     throw error
   }
 }
