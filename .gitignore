@@ -4,3 +4,4 @@ logs/
 uploads/
 npm-debug.log*
 *.log
+.env.*

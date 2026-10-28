@@ -3,6 +3,7 @@ const cors = require('cors')
 const helmet = require('helmet')
 const path = require('path')
 const rateLimit = require('./config/rateLimit')
+const { getDatabaseStatus } = require('./config/db')
 const authMiddleware = require('./middlewares/auth.middleware')
 const sanitizeRequest = require('./middlewares/sanitizeRequest')
 const errorHandler = require('./middlewares/errorHandler')
@@ -58,7 +59,20 @@ app.use(express.urlencoded({ extended: true, limit: REQUEST_BODY_LIMIT }))
 app.use(sanitizeRequest)
 
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'up' })
+  res.status(200).json({
+    status: 'up',
+    database: getDatabaseStatus(),
+  })
+})
+
+app.get('/health/ready', (req, res) => {
+  const database = getDatabaseStatus()
+  const statusCode = database.connected ? 200 : 503
+
+  res.status(statusCode).json({
+    status: database.connected ? 'ready' : 'degraded',
+    database,
+  })
 })
 
 require('./model/associations')
