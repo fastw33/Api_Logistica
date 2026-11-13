@@ -198,16 +198,32 @@ async function assertProviderHasRequiredDocuments(providerId) {
   }
 }
 
+function usesProviderCounterparty(lineKey) {
+  return ['harvest', 'greenway'].includes(String(lineKey || '').trim().toLowerCase())
+}
+
+async function assertCounterpartyHasRequiredDocuments(counterpartyId, lineKey) {
+  if (usesProviderCounterparty(lineKey)) {
+    return assertProviderHasRequiredDocuments(counterpartyId)
+  }
+
+  return assertClientHasRequiredDocuments(counterpartyId)
+}
+
 async function assertQuotationThirdPartiesReady(quotation) {
   if (!quotation) return
 
-  await assertClientHasRequiredDocuments(quotation.customer_id)
+  await assertCounterpartyHasRequiredDocuments(quotation.customer_id, quotation.line_key)
 
   const providerIds = [
     ...new Set(
       (Array.isArray(quotation.provider_quotes) ? quotation.provider_quotes : [])
         .map(providerQuote => String(providerQuote?.provider_id || '').trim())
-        .filter(Boolean)
+        .filter(providerId =>
+          providerId &&
+          !(usesProviderCounterparty(quotation.line_key) &&
+            providerId === String(quotation.customer_id || '').trim())
+        )
     ),
   ]
 
@@ -217,12 +233,17 @@ async function assertQuotationThirdPartiesReady(quotation) {
 }
 
 async function fetchClientDisplayName(clientId) {
+  return fetchCounterpartyDisplayName(clientId, 'fastway')
+}
+
+async function fetchCounterpartyDisplayName(clientId, lineKey) {
   if (!clientId) return ''
 
+  const entity = usesProviderCounterparty(lineKey) ? 'proveedor' : 'cliente'
   const payload = await fetchWmsEntity(
-    `/cliente/${encodeURIComponent(clientId)}`,
-    'No fue posible obtener la informacion del cliente',
-    'No fue posible consultar el cliente en WMS'
+    `/${entity}/${encodeURIComponent(clientId)}`,
+    `No fue posible obtener la informacion del ${entity}`,
+    `No fue posible consultar el ${entity} en WMS`
   )
 
   return String(
@@ -236,8 +257,11 @@ async function fetchClientDisplayName(clientId) {
 }
 
 module.exports = {
+  usesProviderCounterparty,
+  assertCounterpartyHasRequiredDocuments,
   assertClientHasRequiredDocuments,
   assertProviderHasRequiredDocuments,
   assertQuotationThirdPartiesReady,
   fetchClientDisplayName,
+  fetchCounterpartyDisplayName,
 }

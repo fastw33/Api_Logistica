@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { PDFDocument } = require('pdf-lib')
 const PdfPrinter = require('pdfmake')
-const { fetchClientDisplayName } = require('./wmsDocumentRequirements')
+const { fetchCounterpartyDisplayName, usesProviderCounterparty } = require('./wmsDocumentRequirements')
 
 const COLORS = {
   orange: '#F26A21',
@@ -206,7 +206,10 @@ async function resolveQuotationPdfData(quotation) {
   }
 
   try {
-    const resolvedCustomerName = await fetchClientDisplayName(quotation.customer_id)
+    const resolvedCustomerName = await fetchCounterpartyDisplayName(
+      quotation.customer_id,
+      quotation.line_key
+    )
     if (resolvedCustomerName) {
       return {
         ...quotation,
@@ -500,7 +503,9 @@ function buildPdfDefinition(quotation) {
 
   const summaryRows = [
     {
-      label: 'Cliente / contraparte',
+      label: usesProviderCounterparty(quotation?.line_key)
+        ? 'Proveedor / contraparte'
+        : 'Cliente / contraparte',
       value: quotation?.customer_name || quotation?.customer_id,
     },
     { label: 'Asunto', value: quotation?.subject },

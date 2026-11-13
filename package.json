@@ -8,7 +8,7 @@
     "dev": "nodemon src/server.js",
     "db:migrate": "sequelize-cli db:migrate",
     "db:seed": "sequelize-cli db:seed:all",
-    "test": "node --test src/modules/experimentalQuotes/__tests__"
+    "test": "node --test src/modules/experimentalQuotes/__tests__ src/utils/__tests__"
   },
   "keywords": [
     "logistica",

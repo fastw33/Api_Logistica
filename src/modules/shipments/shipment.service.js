@@ -25,7 +25,7 @@ const CustomerInvoice = require('../customerInvoices/customerInvoice.model')
 const VendorInvoice = require('../vendorInvoices/vendorInvoice.model')
 const ShipmentAuditLog = require('../shipmentAuditLogs/shipmentAuditLog.model')
 const {
-  assertClientHasRequiredDocuments,
+  assertCounterpartyHasRequiredDocuments,
   assertQuotationThirdPartiesReady,
 } = require('../../utils/wmsDocumentRequirements')
 
@@ -1150,7 +1150,7 @@ async function syncShipmentDimensions(shipmentId, dimensions, userId) {
 }
 
 async function createShipment(data, userId) {
-  await assertClientHasRequiredDocuments(data.customer_id)
+  await assertCounterpartyHasRequiredDocuments(data.customer_id, data.line_key)
   const sanitizedData = sanitizeShipmentPayload(data)
 
   const transaction = await sequelize.transaction()
