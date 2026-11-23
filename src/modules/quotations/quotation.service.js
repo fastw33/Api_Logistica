@@ -146,8 +146,17 @@ const QUOTATION_DIMENSION_ATTRIBUTES = [
   'created_at',
 ]
 
-function quotationListIncludes() {
-  return [
+function quotationServicesInclude() {
+  return {
+    model: QuotationService,
+    as: 'services',
+    attributes: QUOTATION_SERVICE_ATTRIBUTES,
+    separate: true,
+  }
+}
+
+function quotationListIncludes(includeServices) {
+  const includes = [
     {
       model: Shipment,
       as: 'shipments',
@@ -155,16 +164,13 @@ function quotationListIncludes() {
       separate: true,
     },
   ]
+  if (includeServices) includes.push(quotationServicesInclude())
+  return includes
 }
 
 function quotationDetailIncludes() {
   return [
-    {
-      model: QuotationService,
-      as: 'services',
-      attributes: QUOTATION_SERVICE_ATTRIBUTES,
-      separate: true,
-    },
+    quotationServicesInclude(),
     {
       model: QuotationDocument,
       as: 'documents',
@@ -365,7 +371,11 @@ async function listQuotations(query) {
   const onlyUnsuccessful = ['1', 'true', 'si', 'yes'].includes(
     String(query.only_unsuccessful || '').trim().toLowerCase()
   )
+  const includeServices = String(query.include_services || '').trim().toLowerCase() === 'true'
 
+  if (query.quotation_number !== undefined) {
+    where.quotation_number = String(query.quotation_number).trim().toUpperCase()
+  }
   if (query.status) where.status = query.status
   if (query.customer_id) where.customer_id = query.customer_id
   if (query.transport_mode) where.transport_mode = query.transport_mode
@@ -385,8 +395,8 @@ async function listQuotations(query) {
   const { count, rows } = await Quotation.findAndCountAll({
     where,
     attributes: QUOTATION_LIST_ATTRIBUTES,
-    include: quotationListIncludes(),
-    order: [['created_at', 'DESC']],
+    include: quotationListIncludes(includeServices),
+    order: [['created_at', 'DESC'], ['id', 'DESC']],
     limit,
     offset,
     distinct: true,
